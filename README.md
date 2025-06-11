@@ -3,7 +3,7 @@
 ## Dependencies
 
 * python 3.10
-* pytorch_gpu 1.12.1
+* pytorch_gpu 1.13.1+cu116
 * scikit-learn 1.4.2
 * pytorch-lightning 2.1.0
 * pandas 2.2.1
