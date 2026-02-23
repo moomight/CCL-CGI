@@ -1,6 +1,5 @@
 import torch.nn as nn
 
-
 class AttentionAggregate(nn.Module):
     def __init__(self, d_model, num_heads=4):
         self.d_model = d_model
@@ -18,13 +17,13 @@ class AttentionAggregate(nn.Module):
                     nn.init.zeros_(layer.bias)
 
     def forward(self, x):
-        # x 的形状应为 (batch_size, seq_len, embed_dim)
-        x = x.transpose(0, 1)  # 调整形状为 (seq_len, batch_size, embed_dim)
+        # x translated (batch_size, seq_len, embed_dim)
+        x = x.transpose(0, 1)  # translated (seq_len, batch_size, embed_dim)
         attn_output, attn_weights = self.attention(x, x, x,
                                                    need_weights=True, average_attn_weights=False
                                                    )
         attn_output = attn_output.transpose(0, 1)  # (batch_size, seq_len, embed_dim)
-        # 对序列维度进行平均
+        # translated
         output = attn_output.mean(dim=1)  # (batch_size, embed_dim)
         output = self.layernorm(output)
         output = self.dropout(output)

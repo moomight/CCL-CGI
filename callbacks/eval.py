@@ -7,7 +7,7 @@ from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, average_pre
 import sklearn.metrics as m
 from utils import write_log
 
-#添加指标：ACC, AUPR, AUC-ROC, F1 +std
+#translated:ACC, AUPR, AUC-ROC, F1 +std
 
 class KGCNMetric(Callback):
     def __init__(self, x_train, y_train, x_val, y_val, dataset):
@@ -28,14 +28,16 @@ class KGCNMetric(Callback):
         aupr = history["val_aupr"][-1]
         acc = history["val_acc"][-1]
         f1 = history["val_f1"][-1]
+        mcc = history["val_mcc"][-1]
         logs = dict()
         logs["fold"] = fold
         logs['val_aupr'] = float(aupr)
         logs['val_auc'] = float(auc)
         logs['val_acc'] = float(acc)
         logs['val_f1'] = float(f1)
+        logs['val_mcc'] = float(mcc)
         logs['epoch_count'] = epoch
-        # print(f'Logging Info - epoch: {epoch}, val_auc: {auc}, val_aupr: {aupr}, val_acc: {acc}, val_f1: {f1}')
+        # print(f'Logging Info - epoch: {epoch}, val_auc: {auc}, val_aupr: {aupr}, val_acc: {acc}, val_f1: {f1}, val_mcc: {mcc}')
         write_log('log/train_history_node2vec_tree.txt', logs, mode='a')
 
     @staticmethod

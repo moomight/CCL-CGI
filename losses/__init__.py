@@ -1,3 +1,3 @@
 from .weightedBinaryCrossEntropy import WeightedBinaryCrossEntropy, W_BCEWithLogitsLoss
 from .contrastiveLoss import contrastive_loss, compute_contrastive_loss
-from .triple_loss import compute_triplet_loss
+from .triple_loss import compute_triplet_loss_for_all, compute_triplet_loss_for_hardest_case, compute_triplet_loss_old

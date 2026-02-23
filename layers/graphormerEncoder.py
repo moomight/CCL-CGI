@@ -5,10 +5,10 @@ from .multiHeadAttention import MultiHeadAttention
 
 
 class GraphormerBlock(nn.Module):
-    def __init__(self, d_model, num_heads, dff, rate=0.1, d_sp_enc=8, sp_enc_activation='relu'):
+    def __init__(self, d_model, num_heads, dff, rate=0.1, d_sp_enc=64, sp_enc_activation='relu', n_neighbors=8):
         super(GraphormerBlock, self).__init__()
 
-        self.mha = MultiHeadAttention(d_model, num_heads, d_sp_enc, sp_enc_activation)
+        self.mha = MultiHeadAttention(d_model, num_heads, d_sp_enc, sp_enc_activation, n_neighbors)
         self.ffn = point_wise_feed_forward_network(d_model, dff)
 
         self.layernorm1 = nn.LayerNorm(d_model, eps=1e-6)

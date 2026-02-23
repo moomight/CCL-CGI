@@ -43,6 +43,6 @@ class AttentionFusion(nn.Module):
 
         return self.layernorm(scaled_attention), attention_weights
 
-# 示例用法
+# translated
 # attention_layer = AttentionFusion(d_model=128, n_channels=4)
 # output, attn_weights = attention_layer(torch.randn(32, 128))

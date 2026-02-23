@@ -2,17 +2,31 @@ from __future__ import print_function
 import random
 import numpy as np
 import multiprocessing
+
+try:
+    import torch
+except ImportError:  # pragma: no cover - torch might be unavailable in minimal environments
+    torch = None
 #np.random.seed(42)
 #random.seed(42)
 def deepwalk_walk_wrapper(class_instance, walk_length, start_node):
     class_instance.deepwalk_walk(walk_length, start_node)
 
-
 # deep walker
 class BasicWalker:
-    def __init__(self, G, workers):
+    def __init__(self, G, workers, device=None, use_gpu=False):
         self.G = G
         self.workers = workers
+        self.device = None
+        self.use_torch = False
+
+        if use_gpu and torch is not None:
+            target_device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+            self.device = torch.device(target_device)
+            self.use_torch = self.device.type == "cuda"
+
+        if self.use_torch:
+            self._prepare_torch_graph()
 
     def deepwalk_walk(self, walk_length, start_node):
         '''
@@ -36,6 +50,9 @@ class BasicWalker:
         '''
         Repeatedly simulate random walks from each node.
         '''
+        if self.use_torch:
+            return self._simulate_walks_torch(num_walks, walk_length)
+
         G = self.G
         walks = []
         nodes = list(G.nodes())
@@ -61,14 +78,93 @@ class BasicWalker:
         walks = walks.transpose(1,0,2) ##[n_nodes, n_graphs, n_neighbors]
         return walks
 
+    def _prepare_torch_graph(self):
+        """Prepare padded neighbor tensors for GPU sampling."""
+        nodes = sorted(self.G.nodes())
+        self.nodes_tensor = torch.tensor(nodes, dtype=torch.long, device=self.device)
+        self.node_to_idx = {node: idx for idx, node in enumerate(nodes)}
+
+        neighbor_lists = [list(self.G.neighbors(node)) for node in nodes]
+        max_degree = max((len(nbrs) for nbrs in neighbor_lists), default=0)
+        max_degree = max(max_degree, 1)
+
+        neighbor_tensor = torch.full(
+            (len(nodes), max_degree), -1, dtype=torch.long, device=self.device
+        )
+        degree_tensor = torch.zeros(len(nodes), dtype=torch.long, device=self.device)
+
+        for row, nbrs in enumerate(neighbor_lists):
+            if not nbrs:
+                continue
+            degree_tensor[row] = len(nbrs)
+            neighbor_tensor[row, : len(nbrs)] = torch.tensor(
+                nbrs, dtype=torch.long, device=self.device
+            )
+
+        max_node_id = max(nodes) if nodes else 0
+        idx_lookup = torch.full(
+            (max_node_id + 1,), -1, dtype=torch.long, device=self.device
+        )
+        for node, idx in self.node_to_idx.items():
+            idx_lookup[node] = idx
+
+        self.neighbor_tensor = neighbor_tensor
+        self.degree_tensor = degree_tensor
+        self.idx_lookup = idx_lookup
+        self.max_degree = max_degree
+
+    def _simulate_walks_torch(self, num_walks, walk_length):
+        """GPU-accelerated uniform random walks using torch operations."""
+        if walk_length <= 0:
+            return np.array([], dtype=int)
+
+        walks = []
+        for _ in range(num_walks):
+            walk_tensor = torch.full(
+                (self.nodes_tensor.shape[0], walk_length),
+                -1,
+                dtype=torch.long,
+                device=self.device,
+            )
+            cur_nodes = self.nodes_tensor
+            walk_tensor[:, 0] = cur_nodes
+
+            for step in range(1, walk_length):
+                cur_idx = self.idx_lookup[cur_nodes]
+                valid = cur_idx >= 0
+                deg = self.degree_tensor[cur_idx.clamp(min=0)]
+                valid = valid & (deg > 0)
+                if not torch.any(valid):
+                    break
+
+                deg_valid = deg[valid].to(torch.float32)
+                sampled_positions = torch.floor(
+                    torch.rand(deg_valid.shape[0], device=self.device) * deg_valid
+                ).long()
+                next_nodes = self.neighbor_tensor[
+                    cur_idx[valid], sampled_positions
+                ]
+
+                cur_nodes = cur_nodes.clone()
+                cur_nodes[valid] = next_nodes
+                walk_tensor[:, step] = cur_nodes
+
+            walk_np = walk_tensor.cpu().numpy()
+            walks.append(walk_np)
+
+        walks = np.array(walks, dtype=int)
+        walks = walks.transpose(1, 0, 2)
+        return walks
 
 class Walker:
-    def __init__(self, G, p, q, workers):
+    def __init__(self, G, p, q, workers, device=None, use_gpu=False):
         self.G = G
         self.p = p
         self.q = q
         self.node_size = len(G.nodes())
         # self.look_up_dict = G.look_up_dict
+        self.device = device
+        self.use_gpu = use_gpu
 
     def node2vec_walk(self, walk_length, start_node):
         '''
@@ -114,7 +210,7 @@ class Walker:
             walk = []
             for node in nodes:
                 neighbors = list(G.neighbors(node))
-                # 没有邻居的点不存在于该cell type中
+                # translatedcell typetranslated
                 if len(neighbors) == 0:
                     continue
                 walk.append(self.node2vec_walk(
@@ -179,8 +275,7 @@ class Walker:
 
         return
 
-
-# 作图
+# translated
 def alias_setup(probs):
     '''
     Compute utility lists for non-uniform sampling from discrete distributions.
@@ -213,8 +308,7 @@ def alias_setup(probs):
 
     return J, q
 
-
-# 采样
+# translated
 def alias_draw(J, q):
     '''
     Draw sample from a non-uniform discrete distribution using alias sampling.

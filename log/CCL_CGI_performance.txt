@@ -1,0 +1,46 @@
+
+{
+    "exp_name": "R12_origin_8d_all_spatialType_rw_layerNums_3_graphsNum_6_neighborsNum_8_optimizer_adam_lr_0.005__epoch_200__fold_8",
+    "optimizer": "adam",
+    "epoch": 200,
+    "learning_rate": 0.005,
+    "n_graphs": 6,
+    "n_neighbors": 8,
+    "timestamp": "2026-02-23 22:07:49"
+}
+{
+    "exp_name": "R12_origin_8d_all_spatialType_rw_layerNums_3_graphsNum_6_neighborsNum_8_optimizer_adam_lr_0.005__epoch_200__fold_8",
+    "optimizer": "adam",
+    "epoch": 200,
+    "learning_rate": 0.005,
+    "n_graphs": 6,
+    "n_neighbors": 8,
+    "timestamp": "2026-02-23 22:36:30"
+}
+{
+    "exp_name": "R12_origin_8d_all_spatialType_rw_layerNums_3_graphsNum_6_neighborsNum_8_optimizer_adam_lr_0.005__epoch_200__fold_8",
+    "optimizer": "adam",
+    "epoch": 200,
+    "learning_rate": 0.005,
+    "n_graphs": 6,
+    "n_neighbors": 8,
+    "timestamp": "2026-02-23 22:38:04"
+}
+{
+    "exp_name": "CCL_CGI_spatialType_rw_layerNums_3_graphsNum_6_neighborsNum_8_optimizer_adam_lr_0.005__epoch_200__fold_8",
+    "optimizer": "adam",
+    "epoch": 200,
+    "learning_rate": 0.005,
+    "n_graphs": 6,
+    "n_neighbors": 8,
+    "timestamp": "2026-02-24 00:02:56"
+}
+{
+    "exp_name": "CCL_CGI_spatialType_rw_layerNums_3_graphsNum_6_neighborsNum_8_optimizer_adam_lr_0.005__epoch_200__fold_8",
+    "optimizer": "adam",
+    "epoch": 200,
+    "learning_rate": 0.005,
+    "n_graphs": 6,
+    "n_neighbors": 8,
+    "timestamp": "2026-02-24 00:18:22"
+}

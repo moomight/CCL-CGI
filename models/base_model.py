@@ -14,31 +14,26 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import sys
 
-
 class _EarlyStopping(EarlyStopping, pl.Callback):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
 
 class MyTQDMProgressBar(TQDMProgressBar):
 
     def __init__(self):
         super(MyTQDMProgressBar, self).__init__()
 
-
-
 class _ModelCheckpoint(pl.Callback):
     def __init__(self, dirpath="checkpoint/", filename="checkpoint", monitor="val_auc", mode="max"):
         super(_ModelCheckpoint, self).__init__()
-        if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
-        self.name = dirpath + filename
+        os.makedirs(dirpath, exist_ok=True)
+        self.name = os.path.join(dirpath, filename)
         # self.train_name = dirpath + "train_" + filename
         self.monitor = monitor
         self.mode = mode
         self.value = 0. if mode == "max" else 1e6
 
-    def on_train_epoch_end(self, trainer, module): # 在每轮结束时检查
+    def on_train_epoch_end(self, trainer, module): # translated
         save_state = {}
         for key, value in module.state_dict().items():
             if 'LLM' not in key:
@@ -52,7 +47,6 @@ class _ModelCheckpoint(pl.Callback):
             torch.save(save_state, self.name)
             print(f"model state saved at {self.name}")
 
-
 class CSVLogger(pl.Callback):
     def __init__(self, dirpath="history/", filename="history"):
         super(CSVLogger, self).__init__()
@@ -61,7 +55,7 @@ class CSVLogger(pl.Callback):
         self.name = dirpath + filename
         # self.name += ".csv"
 
-    def on_train_epoch_end(self, trainer, module): # 在每轮结束时保存log到磁盘
+    def on_train_epoch_end(self, trainer, module): # translatedlogtranslated
         history = pd.DataFrame(module.history)
         print(f"---history saved at {self.name}---")
         history.to_csv(self.name, index=False)
@@ -69,9 +63,8 @@ class CSVLogger(pl.Callback):
     def on_sanity_check_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"):
         print(pl_module.history)
 
-
 class LearningCurve(pl.Callback):
-    def __init__(self, dirpath="../curve/", figsize=(4, 4), names=("val_loss", "val_acc", "val_auc", "val_aupr", "val_f1")):
+    def __init__(self, dirpath="../curve/", figsize=(4, 4), names=("val_loss", "val_acc", "val_auc", "val_aupr", "val_f1", "val_mcc")):
         super(LearningCurve, self).__init__()
         if not os.path.exists(dirpath):
             os.makedirs(dirpath)
@@ -79,7 +72,7 @@ class LearningCurve(pl.Callback):
         self.figsize = figsize
         self.names = names
 
-    def on_fit_end(self, trainer, module): # 在.fit结束时画图
+    def on_fit_end(self, trainer, module): # translated.fittranslated
         fold = module.config.K_Fold
         history = module.history
         for i, j in enumerate(self.names):
@@ -99,7 +92,7 @@ class BaseModel(object):
 
     def add_model_checkpoint(self):
         self.callbacks.append(_ModelCheckpoint(
-            # dirpath=self.config.checkpoint_dir,
+            dirpath=self.config.checkpoint_dir,
             filename='{}.pkl'.format(self.config.exp_name),
             monitor=self.config.checkpoint_monitor,
             # save_best_only=self.config.checkpoint_save_best_only,

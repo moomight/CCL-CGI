@@ -3,15 +3,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .spatialEncoding import SpatialEncoding
 
-
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model, num_heads, d_sp_enc, sp_enc_activation):
+    def __init__(self, d_model, num_heads, d_sp_enc, sp_enc_activation, n_neighbors=8):
         super(MultiHeadAttention, self).__init__()
         self.num_heads = num_heads
         self.d_model = d_model
         self.d_sp_enc = d_sp_enc
         self.sp_enc_activation = sp_enc_activation
-        self.spatial_encoding = SpatialEncoding(self.d_sp_enc, self.sp_enc_activation)
+        self.n_neighbors = n_neighbors
+        self.spatial_encoding = SpatialEncoding(d_sp_enc=self.d_sp_enc,
+                                                activation=self.sp_enc_activation,
+                                                d_model=d_model,
+                                                n_neighbors=n_neighbors)
 
         assert d_model % self.num_heads == 0
         self.depth = d_model // self.num_heads
@@ -28,7 +31,7 @@ class MultiHeadAttention(nn.Module):
 
     def forward(self, q, min_distance_matrix, mask=None):
         batch_size = q.size(0)
-        spatial_encoding_bias = self.spatial_encoding(min_distance_matrix)  # [batch_size, seq_len_q, 64]
+        spatial_encoding_bias = self.spatial_encoding(min_distance_matrix)  # [batch_size, seq_len_q, d_model]
 
         q = self.wq(q)  # (batch_size, seq_len, d_model)
         k = self.wk(spatial_encoding_bias)  # (batch_size, seq_len, d_model)
@@ -50,23 +53,22 @@ class MultiHeadAttention(nn.Module):
 
         return output, attention_weights
 
-
 def scaled_dot_product_attention(q, k, v, num_heads, mask=None):
-    # 计算 q 和 k 的点积
+    # translated q translated k translated
     matmul_qk = torch.matmul(q, k.transpose(-2, -1))
     dk = torch.tensor(k.size(-1), dtype=torch.float32)
-    # 缩放点积
+    # translated
     scaling = dk ** -0.5
     scaled_attention_logits = matmul_qk * scaling
 
-    # 添加掩码
+    # translated
     if mask is not None:
         scaled_attention_logits += (mask * -1e9)
 
-    # 计算注意力权重
+    # translated
     attention_weights = F.softmax(scaled_attention_logits, dim=-1)
 
-    # 对 v 加权求和
+    # translated v translated
     output = torch.matmul(attention_weights, v)
 
     return output, attention_weights
