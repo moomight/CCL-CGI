@@ -34,8 +34,6 @@ In the study, CCL-CGI showed strong performance on a large-scale benchmark and d
 ### Environment Setup
 
 ```bash
-python -m venv ccl-cgi
-source ccl-cgi/bin/activate
 python -m pip install -U pip
 python -m pip install uv
 ```
@@ -44,12 +42,13 @@ python -m pip install uv
 
 ```bash
 uv sync  # installs all project dependencies defined in pyproject.toml
+source .venv/bin/activate
 ```
 
 ### Data preparation
 
 For dataset `CCL-CGI`:
-1. Unzip the dataset into `h5/CCL-CGI/`: `tar -xzf h5/CCL-CGI/h5_CCL-CGI.tar.gz -C h5/CCL-CGI --strip-components=1`
+1. Unzip the dataset into `h5/CCL-CGI/`: `tar -xzf h5/CCL-CGI/CCL-CGI.tar.gz -C h5/CCL-CGI --strip-components=1`
 2. Intermediate computation files are expected in:
    - `pdata/CCL-CGI/` (unzip the pdata `pdata_CCL-CGI.tar.gz` or generate by code)
    - `sp/CCL-CGI/` (create the `sp` folder first, then download the sp data at [figshare](https://figshare.com/articles/dataset/CCL_CGI_h5_tar_gz/28777580?file=53613494) and unzip into this folder or generate by code)
