@@ -74,6 +74,9 @@ def create_subgraphs_randomwalk(
             indices = torch.tensor(edge_index, dtype=torch.long, device=device)
             values_t = torch.tensor(values, dtype=torch.float32, device=device)
             adj_sparse = torch.sparse_coo_tensor(indices, values_t, (n, n), device=device).coalesce()
+            # torch.sparse.mm only supports sparse @ dense, so use A^T @ frontier^T and transpose back
+            # to match the original frontier @ A traversal semantics.
+            adj_sparse_t = adj_sparse.transpose(0, 1).coalesce()
 
             result = torch.full((n, n), -1, dtype=torch.int32, device=device)
 
@@ -90,7 +93,7 @@ def create_subgraphs_randomwalk(
 
                 step = 0
                 while frontier.any():
-                    neighbors = torch.sparse.mm(frontier.float(), adj_sparse).to(torch.bool)
+                    neighbors = torch.sparse.mm(adj_sparse_t, frontier.float().transpose(0, 1)).transpose(0, 1).to(torch.bool)
                     neighbors = neighbors & (~visited)
                     step += 1
 
@@ -143,7 +146,7 @@ def create_subgraphs_randomwalk(
             data=pmat,
             compression="gzip",
             compression_opts=4,
-            chunks=(1024, 1024),
+            chunks=(min(1024, n_nodes), min(1024, n_nodes)),
         )
         new_file.close()
         print(f"Saved shortest path matrix to {save_path}")

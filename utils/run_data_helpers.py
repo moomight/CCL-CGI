@@ -154,16 +154,19 @@ def read_network_features_idx_for_cache(
     dataset_name: str,
     use_64d_features: bool,
 ):
-    if dataset_name in ["CPDB_multiomics", "MTG_multiomics", "LTG_multiomics"]:
+    if dataset_name in ["CPDB_multiomics"]:
         adj, features, gene_symbols, *_ = read_multiomicsfile(datapath, use_64d_features=use_64d_features)
         idx = np.arange(0, adj.shape[0])
         return adj, features, gene_symbols, idx
 
     with h5py.File(datapath, "r") as f:
         has_idx = "idx" in f
-        has_labels = ("y_train" in f) or ("train_mask" in f)
 
-    if has_idx and (not has_labels):
+    # Some per-cell-type H5s contain both idx and label/mask fields.
+    # For cache generation we should still prefer the explicit idx
+    # whenever it exists; otherwise idx degenerates to full-range [0..N)
+    # and breaks cell-type specific mapping.
+    if has_idx:
         adj, features, gene_symbols, idx = read_h5file(
             datapath,
             use_64d_features=use_64d_features,

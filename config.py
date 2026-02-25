@@ -64,158 +64,26 @@ cell_type = [
     'Basal cells', 'B cells', 'Alpha cells', 'Adipocytes', 'Acinar cells'
 ]
 
-# cell_type_ppi = {
-#     'T cells3': [
-#         'cd8-positive,_alpha-beta_cytotoxic_t_cell.txt', 'naive_regulatory_t_cell.txt',
-#         'naive_thymus-derived_cd4-positive,_alpha-beta_t_cell.txt', 'cd4-positive_helper_t_cell.txt',
-#         'mature_nk_t_cell.txt', 'cd4-positive,_alpha-beta_memory_t_cell.txt', 'dn1_thymic_pro-t_cell.txt',
-#         'regulatory_t_cell.txt', 'type_i_nk_t_cell.txt',
-#         'cd8-positive,_alpha-beta_cytokine_secreting_effector_t_cell.txt'
-#     ],
-#     'T cells2': [
-#         'cd8-positive,_alpha-beta_cytotoxic_t_cell.txt', 'naive_regulatory_t_cell.txt',
-#         'naive_thymus-derived_cd4-positive,_alpha-beta_t_cell.txt', 'cd4-positive_helper_t_cell.txt',
-#         'mature_nk_t_cell.txt', 'cd4-positive,_alpha-beta_memory_t_cell.txt', 'dn1_thymic_pro-t_cell.txt',
-#         'regulatory_t_cell.txt', 'type_i_nk_t_cell.txt',
-#         'cd8-positive,_alpha-beta_cytokine_secreting_effector_t_cell.txt'
-#     ],
-#     'T cells1': [
-#         'cd8-positive,_alpha-beta_cytotoxic_t_cell.txt', 'naive_regulatory_t_cell.txt',
-#         'naive_thymus-derived_cd4-positive,_alpha-beta_t_cell.txt', 'cd4-positive_helper_t_cell.txt',
-#         'mature_nk_t_cell.txt', 'cd4-positive,_alpha-beta_memory_t_cell.txt', 'dn1_thymic_pro-t_cell.txt',
-#         'regulatory_t_cell.txt', 'type_i_nk_t_cell.txt',
-#         'cd8-positive,_alpha-beta_cytokine_secreting_effector_t_cell.txt'
-#     ],
-#     'Smooth muscle cells': [
-#         'smooth_muscle_cell.txt', 'vascular_associated_smooth_muscle_cell.txt', 'bronchial_smooth_muscle_cell.txt'
-#     ],
-#     'Plasmacytoid dendritic cells': [
-#         'plasmacytoid_dendritic_cell.txt'
-#     ],
-#     'Plasma cells': [
-#         'plasma_cell.txt'
-#     ],
-#     'Pericytes': [
-#         'pericyte_cell.txt'
-#     ],
-#     'Pancreatic stellate cells': [
-#         'pancreatic_stellate_cell.txt'
-#     ],
-#     'NK cells3': [
-#         'nk_cell.txt'
-#     ],
-#     'NK cells2': [
-#         'nk_cell.txt'
-#     ],
-#     'NK cells1': [
-#         'nk_cell.txt'
-#     ],
-#     'Neutrophils': [
-#         'cd24_neutrophil.txt', 'nampt_neutrophil.txt'
-#     ],
-#     'Neurons': [
-#         'retinal_bipolar_neuron.txt'
-#     ],
-#     'Myoepithelial cells': [
-#         'myoepithelial_cell.txt'
-#     ],
-#     'Monocytes': [
-#         'monocyte.txt', 'classical_monocyte.txt', 'intermediate_monocyte.txt', 'non-classical_monocyte.txt'
-#     ],
-#     'Macrophages3': [
-#         'macrophage.txt'
-#     ],
-#     'Macrophages2': [
-#         'macrophage.txt'
-#     ],
-#     'Macrophages1': [
-#         'macrophage.txt'
-#     ],
-#     'Luminal epithelial cells': [
-#         'luminal_cell_of_prostate_epithelium.txt', 'luminal_epithelial_cell_of_mammary_gland.txt'
-#     ],
-#     'Keratinocytes': [
-#         'keratinocyte.txt'
-#     ],
-#     'Hepatocytes': [
-#         'hepatocyte.txt'
-#     ],
-#     'Goblet cells': [
-#         'goblet_cell.txt', 'respiratory_goblet_cell.txt', 'small_intestine_goblet_cell.txt',
-#         'large_intestine_goblet_cell.txt', 'tracheal_goblet_cell.txt'
-#     ],
-#     'Gamma (PP) cells': [
-#         'pancreatic_pp_cell.txt'
-#     ],
-#     'Fibroblasts': [
-#         'fibroblast.txt', 'fibroblast_of_cardiac_tissue.txt', 'alveolar_fibroblast.txt', 'fibroblast_of_breast.txt'
-#     ],
-#     'Enteroendocrine cells': [
-#         'intestinal_enteroendocrine_cell.txt'
-#     ],
-#     'Enterocytes': [
-#         'enterocyte_of_epithelium_of_small_intestine.txt', 'enterocyte_of_epithelium_of_large_intestine.txt',
-#         'mature_enterocyte.txt', 'immature_enterocyte.txt'
-#     ],
-#     'Endothelial cells2': [
-#         'bronchial_vessel_endothelial_cell.txt', 'endothelial_cell.txt', 'artery_endothelial_cell.txt',
-#         'capillary_endothelial_cell.txt', 'cardiac_endothelial_cell.txt', 'endothelial_cell_of_lymphatic_vessel.txt',
-#         'endothelial_cell_of_vascular_tree.txt', 'gut_endothelial_cell.txt', 'retinal_blood_vessel_endothelial_cell.txt',
-#         'endothelial_cell_of_artery.txt', 'vein_endothelial_cell.txt', 'endothelial_cell_of_hepatic_sinusoid.txt',
-#         'lung_microvascular_endothelial_cell.txt', 'lymphatic_endothelial_cell.txt'
-#     ],
-#     'Endothelial cells1': [
-#         'bronchial_vessel_endothelial_cell.txt', 'endothelial_cell.txt', 'artery_endothelial_cell.txt',
-#         'capillary_endothelial_cell.txt', 'cardiac_endothelial_cell.txt', 'endothelial_cell_of_lymphatic_vessel.txt',
-#         'endothelial_cell_of_vascular_tree.txt', 'gut_endothelial_cell.txt', 'retinal_blood_vessel_endothelial_cell.txt',
-#         'endothelial_cell_of_artery.txt', 'vein_endothelial_cell.txt', 'endothelial_cell_of_hepatic_sinusoid.txt',
-#         'lung_microvascular_endothelial_cell.txt', 'lymphatic_endothelial_cell.txt'
-#     ],
-#     'Ductal cells': [
-#         'pancreatic_ductal_cell.txt'
-#     ],
-#     # because plasmacytoid_dendritic_cell already exists, we doesn't add it into dentritic cells
-#     'Dendritic cells2': [
-#         'cd1c-positive_myeloid_dendritic_cell.txt', 'liver_dendritic_cell.txt', 'myeloid_dendritic_cell.txt',
-#         'cd141-positive_myeloid_dendritic_cell.txt', 'dendritic_cell.txt', 'mature_conventional_dendritic_cell.txt'
-#     ],
-#     'Dendritic cells1': [
-#         'cd1c-positive_myeloid_dendritic_cell.txt', 'liver_dendritic_cell.txt', 'myeloid_dendritic_cell.txt',
-#         'cd141-positive_myeloid_dendritic_cell.txt', 'dendritic_cell.txt', 'mature_conventional_dendritic_cell.txt'
-#     ],
-#     'Delta cells': [
-#         'pancreatic_delta_cell.txt'
-#     ],
-#     'Cholangiocytes': [
-#         'intrahepatic_cholangiocyte.txt'
-#     ],
-#     'Beta cells': [
-#         'pancreatic_beta_cell.txt'
-#     ],
-#     'Basal cells': [
-#         'basal_cell.txt', 'basal_cell_of_prostate_epithelium.txt'
-#     ],
-#     'B cells': [
-#         'b_cell.txt'
-#     ],
-#     'Alpha cells': [
-#         'pancreatic_alpha_cell.txt'
-#     ],
-#     'Adipocytes': [
-#         'adipocyte.txt'
-#     ],
-#     'Acinar cells': [
-#         'pancreatic_acinar_cell.txt', 'acinar_cell_of_salivary_gland.txt'
-#     ]
-# }
+singleR_cell_type = [
+ 'Acinar_cells_new', 'B_cells_naive_new', 'B_cells_new', 'CMP_new',
+ 'Cholangiocytes_new', 'Dendritic_cells_new', 'Ductal_cells_new', 'Endothelial_cells_new',
+ 'Enterocytes_new', 'Enteroendocrine_cells_new', 'Epithelial_cells_new',
+ 'Erythroid_like_and_erythroid_precursor_cells_new', 'Fibroblasts_new', 'GMP_new',
+ 'Goblet_cells_new', 'HSC_CD34+_new', 'Keratinocytes_new', 'Luminal_epithelial_cells_new',
+ 'MEP_new', 'MSC_new', 'Macrophages_new', 'Mammary_epithelial_cells_new',
+ 'Monocytes_new', 'Myoepithelial_cells_new', 'NK_cells_new', 'Neurons_new',
+ 'Neutrophils_new', 'Pericytes_new', 'Plasma_cells_new', 'Plasmacytoid_dendritic_cells_new',
+ 'Pro_Myelocyte_new', 'Pulmonary_alveolar_type_II_cells_new', 'Smooth_muscle_cells_new',
+ 'T_cells_new']
+
+
 cell_type_ppi = {
     'CCL-CGI': cell_type,
     'NSCLC': ['B_cell', 'T_cell', 'Myeloid', 'Fibro', 'EC', 'Alveolar'],
-    # Single-file baseline dataset example: ./independent_validation_NSCLC_10033/baseline_NSCLC.h5
-    'NSCLC_BASELINE': ['baseline_NSCLC'],
     'CPDB_multiomics': ['CPDB_multiomics'],
-    'MTG_multiomics': ['MTG_multiomics'],
-    "LTG_multiomics": ["LTG_multiomics"]
+    "singleR": singleR_cell_type,
+    "CCL-CGI_withcancer": cell_type,
+    "cell_state": cell_type
 }
 
 K_SETS = {}

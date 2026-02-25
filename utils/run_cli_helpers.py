@@ -164,7 +164,7 @@ def get_debug_args():
         d_sp_enc=64,
         lr=0.005,
         dropout=0.5,
-        loss_mul=0.25,
+        loss_mul=0.2,
         bz=256,
         spatial="rw",
         cv_folds=10,

@@ -11,10 +11,11 @@ dependencies = [
     "pandas==2.2.1",
     "scikit-learn==1.4.2",
     "torch==1.13.1",
+    "pytorch-lightning==2.1.0",
     "torch-geometric==2.5.3",
     "lightning==2.1.4",
     "matplotlib==3.6.3",
-    "cupy-cuda116==10.6.0"
+    "setuptools==59.6.0"
 ]
 
 [tool.uv.sources]

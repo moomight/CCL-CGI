@@ -46,10 +46,10 @@ torch.set_float32_matmul_precision('high')
 
 def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, lr: float, spatial: str, cv_folds: int,
                  dropout: float, loss_mul: float, dff: int, bz: int,
-                 use_64d_features: bool = False, use_cancer_ppi: bool = False, p: float = 1.2, q: float = 1.5,
+                 use_64d_features: bool = False, use_cancer_ppi: bool = False, p: float = 1.5, q: float = 1.2,
                  model_name: str = 'CCL_CGI', test_run: int = None, n_cell_types: int = 39,
                  data_dir: str = None, h5_dir: str = None, sp_dir: str = None, dataset_name: str = 'CCL-CGI',
-                 force_preprocess: bool = True, d_sp_enc: int = 64, normalize_state_features: bool = False,
+                 force_preprocess: bool = False, d_sp_enc: int = 64, normalize_state_features: bool = False,
                  num_heads_override: int = None, feature_subset: str = 'all', use_pq_template: bool = False,
                  sanitize_features: bool = False,
                  fold_indices=None,
@@ -119,7 +119,6 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
         spatial_template = SPATIAL_TEMPLATE
     adj_template = ADJ_TEMPLATE
     feature_template = FEATURE_TEMPLATE
-    # TODO: include subgraph sampling parameters in cache templates.
 
     # Modify templates based on configuration
     # use_cancer_ppi affects PPI network-related files (subgraphs, spatial, adj, max_degree)
@@ -215,12 +214,19 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
 
     if len(cell_type_list) > 1:
         resolved_global_ppi_h5 = global_ppi_h5
-        if resolved_global_ppi_h5 is None and (not use_cancer_ppi):
-            candidate = os.path.join(base_h5_dir, "global_ppi.h5")
+        if resolved_global_ppi_h5 is None:
+            expected_name = "global_ppi_withcancer.h5" if use_cancer_ppi else "global_ppi.h5"
+            candidate = os.path.join(base_h5_dir, expected_name)
             if os.path.exists(candidate):
                 resolved_global_ppi_h5 = candidate
-        if resolved_global_ppi_h5 is not None:
-            print(f"Using global PPI h5: {resolved_global_ppi_h5}")
+            else:
+                raise FileNotFoundError(
+                    "Global PPI file not found under --h5_dir. "
+                    f"Expected: {candidate}. "
+                    "Please place the expected file there or pass --global_ppi_h5 explicitly."
+                )
+
+        print(f"Using global PPI h5: {resolved_global_ppi_h5}")
         network, y_train, y_val, y_test, train_mask, val_mask, test_mask, id2symbol, symbol2id = read_global_ppi(
             use_cancer_ppi=use_cancer_ppi,
             global_ppi_h5=resolved_global_ppi_h5,
@@ -305,14 +311,7 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
         # It is intentionally disabled now to avoid accidental changes to the default pipeline.
         # If you need it again, re-enable the block below.
         #
-        # Optional 8-d ablation: first 4 dims or last 4 dims
-        # if (not use_64d_features) and feature_subset in ('first4', 'last4'):
-        #     if node_feature.ndim != 2 or node_feature.shape[1] < 8:
-        #         raise ValueError(f"Expected at least 8 feature dims for ablation, got shape={getattr(node_feature, 'shape', None)}")
-        #     if feature_subset == 'first4':
-        #         node_feature = node_feature[:, :4]
-        #     else:  # last4
-        #         node_feature = node_feature[:, 4:8]
+        
         if (not use_64d_features) and feature_subset != 'all':
             print(f"⚠️ feature_subset={feature_subset} requested but 4-dim ablation is disabled; proceeding with all 8 dims.")
             feature_subset = 'all'
