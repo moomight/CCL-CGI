@@ -133,4 +133,4 @@ Notes:
 - Configurable Arguments [`doc/CCL-CGI_CONFIGURABLE_ARGUMENTS.md`](doc/CCL-CGI_CONFIGURABLE_ARGUMENTS.md)
 - Model Card [`doc/modelcard.md`](doc/modelcard.md)
 - Reproducibility for additional datasets [`doc/Additional_Datasets_Reproducibility`](doc/Additional_Datasets_Reproducibility.md)
-- Attention Weights []
+- Attention Weights and prediction score are stored in `related_files`
