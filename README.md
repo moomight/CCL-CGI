@@ -51,7 +51,7 @@ For dataset `CCL-CGI`:
 1. Unzip the dataset into `h5/CCL-CGI/`: `tar -xzf h5/CCL-CGI/CCL-CGI.tar.gz -C h5/CCL-CGI --strip-components=1`
 2. Intermediate computation files are expected in:
    - `pdata/CCL-CGI/` (unzip the pdata `pdata_CCL-CGI.tar.gz` or generate by code)
-   - `sp/CCL-CGI/` (create the `sp` folder first, then download the sp data at [figshare](https://figshare.com/articles/dataset/CCL_CGI_h5_tar_gz/28777580?file=53613494) and unzip into this folder or generate by code)
+   - `sp/CCL-CGI/` (create the `sp` folder first, then download the sp data at [figshare](https://doi.org/10.6084/m9.figshare.28777580) and unzip into this folder or generate by code)
 
 ## Run Command
 
