@@ -17,13 +17,11 @@ class AttentionAggregate(nn.Module):
                     nn.init.zeros_(layer.bias)
 
     def forward(self, x):
-        # x translated (batch_size, seq_len, embed_dim)
-        x = x.transpose(0, 1)  # translated (seq_len, batch_size, embed_dim)
+        x = x.transpose(0, 1)
         attn_output, attn_weights = self.attention(x, x, x,
                                                    need_weights=True, average_attn_weights=False
                                                    )
         attn_output = attn_output.transpose(0, 1)  # (batch_size, seq_len, embed_dim)
-        # translated
         output = attn_output.mean(dim=1)  # (batch_size, embed_dim)
         output = self.layernorm(output)
         output = self.dropout(output)

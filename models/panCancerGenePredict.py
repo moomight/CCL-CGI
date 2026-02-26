@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from config import LOG_DIR, RESULT_DIR
 import pandas as pd
 import os
-from losses import compute_triplet_loss_for_hardest_case, compute_triplet_loss_for_all, compute_triplet_loss_old
+from losses import compute_triplet_loss_for_hardest_case, compute_triplet_loss_for_all
 
 class PanCancerGenePredict(pl.LightningModule):
     def __init__(self, config):
@@ -19,24 +19,17 @@ class PanCancerGenePredict(pl.LightningModule):
         use_cuda = requested_device.startswith('cuda') and torch.cuda.is_available()
         self.runtime_device = torch.device('cuda' if use_cuda else 'cpu')
         self.temp = 0.3
-        self.threshold = 0.5
+        self.threshold = getattr(self.config, 'threshold', 0.5)
         self.auto_threshold_by_val_f1 = bool(getattr(self.config, 'auto_threshold_by_val_f1', False))
         seed = 42
         torch.manual_seed(seed)
         if use_cuda:
             torch.cuda.manual_seed(seed)
             torch.cuda.manual_seed_all(seed)
-        # translated,translatedLLMtranslated
-        # translated
-        # self.fc = nn.Sequential(
-        #     nn.Linear(39 * self.config.d_model, 256),
-        #     nn.ReLU(),
-        #     nn.Dropout(self.config.dropout),
-        #     nn.Linear(256, 1)
-        # )
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
         self.fc = nn.Sequential(
             nn.Linear(self.config.d_model, 256),
-            # nn.BatchNorm1d(256), # translated
             nn.ReLU(),
             nn.Dropout(self.config.dropout),
             nn.Linear(256, 128),
@@ -57,7 +50,6 @@ class PanCancerGenePredict(pl.LightningModule):
         bias_value = -torch.log((1 - positive_fraction) / positive_fraction)
         self.fc[-1].bias.data.fill_(bias_value)
 
-        # translatedGraphormertranslated
         self.graphormer_layers = nn.ModuleList(
             [GraphormerBlock(self.config.d_model, self.config.num_heads, self.config.dff, self.config.dropout,
                              self.config.d_sp_enc, self.config.sp_enc_activation, self.config.n_neighbors)
@@ -71,28 +63,18 @@ class PanCancerGenePredict(pl.LightningModule):
         self.attentionLayer = AttentionFusion(d_model=self.config.d_model, n_channels=self.config.n_graphs).to(self.runtime_device)
         self.aggregateLayer = AttentionAggregate(d_model=self.config.d_model, num_heads=self.config.num_heads).to(self.runtime_device)
 
-        # No feature projection needed - d_model is set dynamically based on feature dimensions
-        # config.d_model is already set to match feature dimensions (8 or 64) in main.py
         self.Linear = nn.Linear(self.config.d_model, self.config.d_model).to(self.runtime_device)
         self.Relu = nn.ReLU()
 
-        # translated,translatedBCELoss,translated
-        # pos_weight = (1 - loss_mul) / loss_mul
-        # loss_mul translated,translated 0.2 translated20%translated,80%translated
-        # pos_weight = 0.8 / 0.2 = 4.0,translatedlosstranslated4translated
         pos_weight_value = (1.0 - self.config.loss_mul) / self.config.loss_mul
         self.criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(pos_weight_value, device=self.runtime_device))
         print(f"BCEWithLogitsLoss pos_weight set to {pos_weight_value:.4f} (based on loss_mul={self.config.loss_mul})")
 
-        # ===== GPUtranslated: translatedtensors,translated =====
-        # translated idx translated GPU tensors translated
         self.cached_idx_tensors = [
             torch.tensor(config.idx[i], dtype=torch.long, device=self.runtime_device)
             for i in range(self.config.n_cell_types)
         ]
 
-        # translated node_feature, distance_matrix, spatial_matrix, node_neighbor translated GPU tensors
-        # translated get_sub_info translated
         self.cached_node_features = [
             torch.tensor(config.node_feature[i], dtype=torch.float32, device=self.runtime_device)
             for i in range(self.config.n_cell_types)
@@ -122,18 +104,15 @@ class PanCancerGenePredict(pl.LightningModule):
                 membership[safe_idx] = True
             self.cached_membership_masks.append(membership)
 
-        # translated idx_dict (translated) - translated tensor translated
         self.cached_idx_mappings = []
         for i in range(self.config.n_cell_types):
             idx = config.idx[i]
-            # translatedtensor (translatedindextranslated)
             max_idx = max(idx) if len(idx) > 0 else 0
             mapping = torch.zeros(max_idx + 1, dtype=torch.long, device=self.runtime_device)
             for local_i, global_idx in enumerate(idx):
                 mapping[global_idx] = local_i
             self.cached_idx_mappings.append(mapping)
 
-        # translated sqrt(d_model) translated
         self.sqrt_d_model = torch.sqrt(torch.tensor(self.config.d_model, dtype=torch.float32, device=self.runtime_device))
 
         self.alpha = nn.Parameter(torch.tensor(1.0, requires_grad=True))
@@ -169,10 +148,7 @@ class PanCancerGenePredict(pl.LightningModule):
         finalembedding = self.embedding_layer(input_node_id, self.config)
         finalembedding_ = finalembedding.view(len(input_node_id), -1, self.config.d_model)
         finalembedding_, _ = self.aggregateLayer(finalembedding_) # _: attention weights
-        # x = self.fc(finalembedding)
         x = self.fc(finalembedding_)
-        # x = self.sigmoid(x)
-        # return x, finalembedding
         return x, finalembedding, finalembedding_, _
 
     def training_step(self, batch, batch_idx):
@@ -183,12 +159,9 @@ class PanCancerGenePredict(pl.LightningModule):
         y_predict, celltypeEmbedding, embedding, attention_weight = self(x)
         y_predict, y = self._flatten_logits_and_labels(y_predict, y)
 
-        # translated criterion (translated config.loss_mul)
-        # translatedbatchtranslated pos_weight
         classification_loss = self.criterion(y_predict, y)
 
         triplet_loss = compute_triplet_loss_for_all(embedding, y)
-        # triplet_loss = compute_triplet_loss_old(embedding, y)
 
         alpha = torch.exp(self.alpha)
         beta = torch.exp(self.beta)
@@ -313,7 +286,6 @@ class PanCancerGenePredict(pl.LightningModule):
         classification_loss = self.criterion(y_predict, y)
 
         triplet_loss = compute_triplet_loss_for_all(embedding, y)
-        # triplet_loss = compute_triplet_loss_old(embedding, y)
 
         alpha = torch.exp(self.alpha)
         beta = torch.exp(self.beta)
@@ -322,16 +294,13 @@ class PanCancerGenePredict(pl.LightningModule):
         y_score = torch.sigmoid(y_predict) if self.auto_threshold_by_val_f1 else y_predict
         auc, acc, p, r, f1, aupr, fpr, tpr, mcc = score(y, y_score, self.threshold, False)
 
-        # 🚀 GPUtranslated: translated GPU tensor translated,translated CPU-GPU translated
-        # translated numpy (translated on_test_end translated)
         if not hasattr(self, 'test_predictions'):
             self.test_predictions = []
             self.test_labels = []
 
-        # Convert logits to probabilities (translated GPU translated)
         y_proba = torch.sigmoid(y_predict)
-        self.test_predictions.append(y_proba.detach())  # translated GPU tensor
-        self.test_labels.append(y.detach())  # translated GPU tensor
+        self.test_predictions.append(y_proba.detach())
+        self.test_labels.append(y.detach())
 
         self.test_loss.append(loss)
         self.test_acc.append(acc)
@@ -367,11 +336,9 @@ class PanCancerGenePredict(pl.LightningModule):
             import numpy as np
             from utils.statistical_tests import calculate_calibration_metrics, find_optimal_threshold
 
-            # 🚀 GPUtranslated: translated CPU (translated)
             y_true = torch.cat(self.test_labels, dim=0).cpu().numpy()
             y_pred_proba = torch.cat(self.test_predictions, dim=0).cpu().numpy()
 
-            # 🔬 translated (DeLong test, Bootstrap CI)
             self.test_y_true_raw = y_true
             self.test_y_pred_proba_raw = y_pred_proba
 
@@ -401,7 +368,7 @@ class PanCancerGenePredict(pl.LightningModule):
         else:
             self.test_brier_final = None
             self.test_ece_final = None
-            self.test_optimal_threshold = 0.5
+            self.test_optimal_threshold = getattr(self.config, 'threshold', 0.5)
             self.test_optimal_precision = None
             self.test_optimal_recall = None
             self.test_optimal_f1 = None
@@ -439,10 +406,6 @@ class PanCancerGenePredict(pl.LightningModule):
         }
 
     def embedding_layer(self, node_id, config):
-        """
-        GPUtranslated: translated,translated for translated tensor translated
-        """
-        # translated node_id translated
         if not torch.is_tensor(node_id):
             node_id = torch.tensor(node_id, dtype=torch.long, device=self.device)
         elif node_id.device != self.device:
@@ -450,12 +413,10 @@ class PanCancerGenePredict(pl.LightningModule):
 
         batch_size = len(node_id)
 
-        # translated embedding tensor (translated)
         # Shape: (n_cell_types, batch_size, d_model)
         finalembedding = torch.zeros(self.config.n_cell_types, batch_size, self.config.d_model,
                                      dtype=torch.float32, device=self.device)
 
-        # translated cell types
         for i in range(self.config.n_cell_types):
             membership = self.cached_membership_masks[i]
             max_global = int(membership.shape[0] - 1)
@@ -486,24 +447,18 @@ class PanCancerGenePredict(pl.LightningModule):
         return finalembedding
 
     def get_cell_type_layer_embeddings(self, input_node_id, cell_type_num):
-        """
-        GPUtranslated: translated
-        """
+        
         sub_node_feature, sub_distance, sub_spatial, sub_node_neighbor = self.get_sub_info(input_node_id, cell_type_num)
         sub_node_feature = torch.nan_to_num(sub_node_feature, 0.0)
 
         batch_size = sub_node_feature.size(0)
         n_graphs = self.config.n_graphs
 
-        # translated node_embedding (translated list.append)
         # Shape: (batch, n_graphs, d_model)
         node_embedding = torch.zeros(batch_size, n_graphs, self.config.d_model,
                                      dtype=torch.float32, device=self.device)
 
-        # translated graph (translated Graphormer layers translated)
-        # translated
         for g in range(n_graphs):
-            # translated centrality encoding
             centr_encoding = self.centrEncodingLayer[cell_type_num](sub_distance[:, g, :, :])
             out = self.get_node_feature(sub_node_feature[:, g, :, :], centr_encoding)
 
@@ -515,15 +470,12 @@ class PanCancerGenePredict(pl.LightningModule):
             mask = self.create_padding_mask(spatial_matrix_in_subgraphs[:, 0, :, :])
             attention_mask = mask.unsqueeze(1)
 
-            # Graphormer layers - translated
             for n in range(self.config.n_layers):
                 spatial_matrix_hop = spatial_matrix_in_subgraphs[:, 0, :, :]
                 out, _ = self.graphormer_layers[n](out, self.config.training, attention_mask, spatial_matrix_hop)
 
-            # translated token translated embedding
             node_embedding[:, g, :] = out[:, 0, :]
 
-        # Reshape translated
         # (batch, n_graphs, d_model) -> (batch, n_graphs * d_model)
         aggreated_out = node_embedding.reshape(batch_size, -1)
         finalembedding, _ = self.attentionLayer(aggreated_out)
@@ -534,29 +486,20 @@ class PanCancerGenePredict(pl.LightningModule):
         return (nodes == -1).float()
 
     def get_node_feature(self, node_embedding, centr_encoding):
-        """
-        GPUtranslated: translated sqrt(d_model),translated tensor
-        """
+        
         node_feature = node_embedding
-        node_feature = node_feature * self.sqrt_d_model  # translated
+        node_feature = node_feature * self.sqrt_d_model
         node_feature = node_feature + centr_encoding
 
         return F.dropout(node_feature, p=self.config.dropout, training=self.config.training)
 
     def get_sub_info(self, node_id, cell_type_num):
-        """
-        🚀 GPUtranslated: translated tensors,translated:
-        1. translated torch.tensor() translated
-        2. CPU -> GPU translated
-        3. Python list translated (.item(), list comprehension)
-        4. translated
-        """
+        
         length = len(node_id)
 
         num_global_nodes = int(self.cached_node_neighbors[cell_type_num].shape[0])
         node_id_safe = torch.clamp(node_id, 0, max(num_global_nodes - 1, 0))
 
-        # translated node_neighbor tensor (translated GPU translated)
         node_neighbors = torch.index_select(self.cached_node_neighbors[cell_type_num], 0, node_id_safe)
         node_neighbors = node_neighbors.squeeze(dim=1)
 
@@ -566,24 +509,19 @@ class PanCancerGenePredict(pl.LightningModule):
             self_id = node_id_safe.view(-1, 1, 1).expand_as(node_neighbors)
             node_neighbors = torch.where(node_neighbors < 0, self_id, node_neighbors)
 
-        # translated idx_mapping tensor translated
-        # translated Python translated list comprehension
         flat_node_neighbor = node_neighbors.view(-1)
 
         # Safety clamp for downstream index_select (distance_matrix is sized by full graph nodes)
         max_valid = int(self.cached_distance_matrices[cell_type_num].shape[0] - 1)
         flat_node_neighbor_safe = torch.clamp(flat_node_neighbor, 0, max_valid)
 
-        # GPU translated (translated Python dict translated)
         mapping = self.cached_idx_mappings[cell_type_num]
-        # translated: translated 0
         flat_node_neighbor_clamped = torch.clamp(flat_node_neighbor_safe, 0, len(mapping) - 1)
         mapped_indices = mapping[flat_node_neighbor_clamped]
 
         feature_n = int(self.cached_node_features[cell_type_num].shape[0])
         mapped_indices = torch.clamp(mapped_indices, 0, max(feature_n - 1, 0))
 
-        # translated node_feature tensor
         node_feature = self.cached_node_features[cell_type_num][mapped_indices]
 
         if node_feature.numel() == 0:
@@ -591,11 +529,9 @@ class PanCancerGenePredict(pl.LightningModule):
 
         node_feature = node_feature.reshape(length, self.config.n_graphs, self.config.n_neighbors, -1)
 
-        # translated distance_matrix tensor
         distance = torch.index_select(self.cached_distance_matrices[cell_type_num], 0, flat_node_neighbor_safe)
         distance = distance.reshape(length, self.config.n_graphs, self.config.n_neighbors, -1)
 
-        # translated spatial_matrix tensor
         spatial = torch.index_select(self.cached_spatial_matrices[cell_type_num], 0, node_id_safe)
         spatial = spatial.squeeze(dim=1)
 

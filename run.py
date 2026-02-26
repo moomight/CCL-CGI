@@ -38,6 +38,7 @@ from utils.run_cli_helpers import (
     setup_runtime_environment,
     print_run_configuration,
 )
+from utils.run_manifest import generate_run_manifest, print_manifest_summary
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -56,6 +57,7 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
                  global_ppi_h5: str | None = None,
                  reuse_checkpoint: bool = False,
                  checkpoint_path: str | None = None,
+                 threshold: float | None = None,
                  auto_threshold_by_val_f1: bool = False,
                  exclude_cell_types: list[str] | None = None):
 
@@ -523,6 +525,7 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
             positive_fraction=positive_fraction,
             checkpoint_path=fold_checkpoint_path,
             auto_threshold_by_val_f1=auto_threshold_by_val_f1,
+            threshold=threshold,
         )
         
         collect_fold_metrics(results=results, test_metrics=test_metrics)
@@ -591,6 +594,11 @@ if __name__ == '__main__':
         log_dir=LOG_DIR,
         model_saved_dir=MODEL_SAVED_DIR,
     )
+    
+    # Generate run manifest for reproducibility
+    manifest_path = generate_run_manifest(args, output_dir="history")
+    print_manifest_summary(manifest_path)
+    
     print_run_configuration(args)
 
     process_data(
@@ -627,6 +635,7 @@ if __name__ == '__main__':
         global_ppi_h5=args.global_ppi_h5,
         reuse_checkpoint=args.reuse_checkpoint,
         checkpoint_path=args.checkpoint_path,
+        threshold=args.threshold,
         auto_threshold_by_val_f1=args.auto_threshold_by_val_f1,
         exclude_cell_types=args.exclude_cell_types,
     )

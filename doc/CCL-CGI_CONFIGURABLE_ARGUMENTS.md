@@ -39,9 +39,11 @@ This document summarizes commonly used runtime arguments in `run.py`.
 - `--test_run`
 - `--reuse_checkpoint`
 - `--checkpoint_path`
+- `--threshold`
 - `--auto_threshold_by_val_f1`
 
 ## Threshold Policy
 
-- Default (no flag): fixed threshold `0.5`
-- With `--auto_threshold_by_val_f1`: automatically select the best threshold on the validation split by F1 score
+- Default (no flag): fixed threshold `0.5` (from `config.py` → `ModelConfig.threshold`)
+- With `--threshold 0.7`: override the default threshold to the specified value
+- With `--auto_threshold_by_val_f1`: automatically select the best threshold on the validation split by F1 score (ignores `--threshold`)

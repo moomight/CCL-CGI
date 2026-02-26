@@ -36,6 +36,8 @@ def setup_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
 
@@ -58,7 +60,7 @@ def get_optimizer(op_type, learning_rate, model_parameters):
 def train(Kfold, dataset, train_label, test_label, val_label, train_id, test_id, val_id, n_graphs, n_neighbors, n_layers, spatial_type, idx,
           max_degree, batch_size, embed_dim, num_heads, d_sp_enc, dff, l2_weights, lr, dropout, loss_mul, optimizer, n_epoch, DISTANCE_MATRIX, NODE_FEATURE, NODE_NEIGHBOR, SPATIAL_MATRIX, ADJ,
           model_name='mlp_triple', callbacks_to_add=None, overwrite=True, n_cell_types=39, positive_fraction=0.25,
-          monitor_metric=None, checkpoint_path=None, auto_threshold_by_val_f1=False):
+          monitor_metric=None, checkpoint_path=None, auto_threshold_by_val_f1=False, threshold=None):
 
 
     config = ModelConfig()
@@ -92,6 +94,8 @@ def train(Kfold, dataset, train_label, test_label, val_label, train_id, test_id,
     config.n_cell_types = n_cell_types
     config.positive_fraction = positive_fraction
     config.auto_threshold_by_val_f1 = bool(auto_threshold_by_val_f1)
+    if threshold is not None:
+        config.threshold = float(threshold)
     if monitor_metric is not None:
         config.checkpoint_monitor = str(monitor_metric)
         config.early_stopping_monitor = str(monitor_metric)

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 class WeightedBinaryCrossEntropy(nn.Module):
     def __init__(self, pos_ratio):
         super(WeightedBinaryCrossEntropy, self).__init__()
-        self.pos_ratio = pos_ratio # translated
+        self.pos_ratio = pos_ratio
         self.neg_ratio = 1.0 - pos_ratio
         self.sample_weights = torch.tensor(self.neg_ratio / self.pos_ratio, dtype=torch.float32)
 
@@ -13,12 +13,11 @@ class WeightedBinaryCrossEntropy(nn.Module):
         y = y_true.float()
         epsilon = torch.finfo(y_pred.dtype).eps
         y_pred = torch.clamp(y_pred, epsilon, 1 - epsilon)
-        y_pred = torch.log(y_pred / (1 - y_pred))  # translated
+        y_pred = torch.log(y_pred / (1 - y_pred))
 
         loss = F.binary_cross_entropy_with_logits(y_pred, y, weight=self.sample_weights)
         return torch.mean(loss * self.pos_ratio, dim=-1)
 
-# translated
 # criterion = WeightedBinaryCrossEntropy(pos_ratio=0.2)
 # loss = criterion(y_true, y_pred)
 

@@ -7,7 +7,6 @@ from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, average_pre
 import sklearn.metrics as m
 from utils import write_log
 
-#translated:ACC, AUPR, AUC-ROC, F1 +std
 
 class KGCNMetric(Callback):
     def __init__(self, x_train, y_train, x_val, y_val, dataset):

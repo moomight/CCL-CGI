@@ -210,7 +210,6 @@ class Walker:
             walk = []
             for node in nodes:
                 neighbors = list(G.neighbors(node))
-                # translatedcell typetranslated
                 if len(neighbors) == 0:
                     continue
                 walk.append(self.node2vec_walk(
@@ -275,7 +274,6 @@ class Walker:
 
         return
 
-# translated
 def alias_setup(probs):
     '''
     Compute utility lists for non-uniform sampling from discrete distributions.
@@ -308,7 +306,6 @@ def alias_setup(probs):
 
     return J, q
 
-# translated
 def alias_draw(J, q):
     '''
     Draw sample from a non-uniform discrete distribution using alias sampling.

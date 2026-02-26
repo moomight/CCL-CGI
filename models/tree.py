@@ -142,18 +142,16 @@ class TREE(BaseModel):
                 'mcc': self.model.test_mcc_final if hasattr(self.model, 'test_mcc_final') else None,
                 'brier': self.model.test_brier_final if hasattr(self.model, 'test_brier_final') else None,
                 'ece': self.model.test_ece_final if hasattr(self.model, 'test_ece_final') else None,
-                'optimal_threshold': self.model.test_optimal_threshold if hasattr(self.model, 'test_optimal_threshold') else 0.5,
+                'optimal_threshold': self.model.test_optimal_threshold if hasattr(self.model, 'test_optimal_threshold') else getattr(self.config, 'threshold', 0.5),
                 'optimal_precision': self.model.test_optimal_precision if hasattr(self.model, 'test_optimal_precision') else None,
                 'optimal_recall': self.model.test_optimal_recall if hasattr(self.model, 'test_optimal_recall') else None,
                 'optimal_f1': self.model.test_optimal_f1 if hasattr(self.model, 'test_optimal_f1') else None
             },
-            # 🔬 translatedDeLong testtranslatedBootstrap CI
             'y_true': self.model.test_y_true_raw if hasattr(self.model, 'test_y_true_raw') else None,
             'y_pred_proba': self.model.test_y_pred_proba_raw if hasattr(self.model, 'test_y_pred_proba_raw') else None
         }
-    # TODO: add return labels in TREE.test
 
-    def score(self, x, y, threshold=0.6):  ##translated
+    def score(self, x, y, threshold=0.5):
         x = torch.tensor(x).to(self._runtime_device())
         y_pred = self.predict(x).cpu()
         y_true = y.float().cpu()
@@ -229,7 +227,7 @@ class TREE(BaseModel):
                 y_pred_proba_batches.append(torch.sigmoid(logits).detach().cpu())
 
         if len(y_true_batches) == 0:
-            self.model.threshold = 0.5
+            self.model.threshold = getattr(self.config, 'threshold', 0.5)
             print('Logging Info - Validation threshold tuning skipped: empty validation data, using threshold=0.5')
             return
 
@@ -237,7 +235,7 @@ class TREE(BaseModel):
         y_pred_proba = torch.cat(y_pred_proba_batches, dim=0).numpy()
 
         if len(np.unique(y_true)) < 2:
-            self.model.threshold = 0.5
+            self.model.threshold = getattr(self.config, 'threshold', 0.5)
             print('Logging Info - Validation threshold tuning skipped: single-class validation labels, using threshold=0.5')
             return
 

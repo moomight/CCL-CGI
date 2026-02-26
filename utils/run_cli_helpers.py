@@ -98,6 +98,12 @@ def parse_args():
         help="Skip training for a fold if its checkpoint already exists, then run test directly.",
     )
     parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="Override default classification threshold (default: use config.py value, 0.5). Ignored when --auto_threshold_by_val_f1 is set.",
+    )
+    parser.add_argument(
         "--auto_threshold_by_val_f1",
         action="store_true",
         default=False,
@@ -182,6 +188,7 @@ def get_debug_args():
         fold_idx=None,
         reuse_checkpoint=False,
         checkpoint_path=None,
+        threshold=None,
         auto_threshold_by_val_f1=False,
         global_ppi_h5=None,
         n_cell_types=39,
@@ -200,6 +207,9 @@ def get_runtime_args(debug_mode: bool = False):
 
 
 def setup_runtime_environment(args, *, log_dir: str, model_saved_dir: str):
+    # Import determinism settings from config
+    from config import CUDNN_DETERMINISTIC, CUDNN_BENCHMARK
+    
     has_cuda = bool(torch.cuda.is_available())
     if has_cuda:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -207,12 +217,22 @@ def setup_runtime_environment(args, *, log_dir: str, model_saved_dir: str):
         print("⚠️ CUDA is not available. Falling back to CPU execution.")
 
     seed = args.seed
+    
     torch.manual_seed(seed)
     if has_cuda:
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = CUDNN_DETERMINISTIC
+        torch.backends.cudnn.benchmark = CUDNN_BENCHMARK
     random.seed(seed)
     np.random.seed(seed)
+    
+    print(f"✓ Random seed: {seed}")
+    if args.threshold is not None:
+        print(f"✓ Threshold (CLI override): {args.threshold}")
+    if has_cuda:
+        print(f"✓ cuDNN deterministic: {CUDNN_DETERMINISTIC}")
+        print(f"✓ cuDNN benchmark: {CUDNN_BENCHMARK}")
 
     resolved_data_dir = args.data_dir if args.data_dir is not None else os.path.join(os.getcwd(), "pdata", args.dataset_name)
     resolved_sp_dir = args.sp_dir if args.sp_dir is not None else os.path.join(os.getcwd(), "sp", args.dataset_name)
@@ -224,6 +244,8 @@ def setup_runtime_environment(args, *, log_dir: str, model_saved_dir: str):
 
 
 def print_run_configuration(args):
+    from config import CUDNN_DETERMINISTIC, CUDNN_BENCHMARK
+    
     print("=" * 80)
     print("CCL-CGI Configuration")
     print("=" * 80)
@@ -251,8 +273,15 @@ def print_run_configuration(args):
     if args.checkpoint_path is not None:
         print(f"  checkpoint_path: {args.checkpoint_path}")
     print(f"  auto_threshold_by_val_f1: {args.auto_threshold_by_val_f1}")
+    if args.threshold is not None:
+        print(f"  threshold (CLI override): {args.threshold}")
     print(f"  seed: {args.seed}")
     print(f"  gpu: {args.gpu}")
+
+    print("\nReproducibility Settings (from config.py):")
+    print(f"  random_seed: {args.seed}")
+    print(f"  cudnn_deterministic: {CUDNN_DETERMINISTIC}")
+    print(f"  cudnn_benchmark: {CUDNN_BENCHMARK}")
 
     print("\nData Processing Parameters:")
     print(f"  use_64d_features: {args.use_64d_features}")

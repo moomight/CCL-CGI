@@ -47,7 +47,10 @@ RESULT_LOG={
 PERFORMANCE_LOG = 'CCL_CGI_performance.txt'
 
 RESULT_DIR = '/result_CCL_CGI.csv'
-# TODO: translatedruntranslateddirectory
+
+CUDNN_DETERMINISTIC = True   # Set to False for better performance (less reproducible)
+CUDNN_BENCHMARK = False      # Set to True for better performance (less reproducible)
+
 
 cell_type = [
     'T cells3', 'T cells2', 'T cells1',
@@ -95,7 +98,7 @@ class ModelConfig(object):
         self.n_layers = 2
         self.d_model = 8
         self.l2_weight = 1e-7  # l2 regularizer weight
-        self.lr = 0.001  # learning rate
+        self.lr = 0.005  # learning rate
         self.n_epoch = 200,
         self.dff = 8
         self.max_degree = []
@@ -148,7 +151,7 @@ class ModelConfig(object):
         self.early_stopping_monitor = 'val_auc'
         # self.early_stopping_monitor = 'val_aupr'
         self.early_stopping_mode = 'max'
-        self.early_stopping_patience = 30 # TODO
+        self.early_stopping_patience = 30 
         self.early_stopping_verbose = 1
         self.K_Fold = 1
         self.callbacks_to_add = None
@@ -169,3 +172,4 @@ class ModelConfig(object):
 
         self.positive_fraction = None
         self.auto_threshold_by_val_f1 = False
+        self.threshold = 0.5  # Default classification threshold; overridden by --auto_threshold_by_val_f1

@@ -62,7 +62,7 @@ python run.py --dataset_name CCL-CGI --n_cell_types 39 --cv_folds 10 --spatial r
 
 Optional threshold behavior:
 
-- Default: fixed threshold `0.5`
+- Default: fixed threshold `0.5`, can be changed by arg `--threshold <your_threshold>`
 - Add `--auto_threshold_by_val_f1` to select threshold automatically by validation F1
 
 ## Quick Check 
@@ -70,7 +70,7 @@ Optional threshold behavior:
 ### Run only one fold
 
 ```bash
-python run.py --dataset_name CCL-CGI --n_cell_types 39 --fold_idx 8 --cv_folds 10 --spatial rw --n_graphs 6 --n_neighbors 8 --n_layers 3 --dff 8 --d_sp_enc 64 --lr 0.005 --dropout 0.5 --loss_mul 0.2 --bz 256 --h5_dir ./h5/CCL-CGI --data_dir ./pdata/CCL-CGI --sp_dir ./sp/CCL-CGI --gpu 0 --seed 42
+python run.py --dataset_name CCL-CGI --n_cell_types 39 --fold_idx 1 --cv_folds 10 --spatial rw --n_graphs 6 --n_neighbors 8 --n_layers 3 --dff 8 --d_sp_enc 64 --lr 0.005 --dropout 0.5 --loss_mul 0.2 --bz 256 --h5_dir ./h5/CCL-CGI --data_dir ./pdata/CCL-CGI --sp_dir ./sp/CCL-CGI --gpu 0 --seed 42
 ```
 
 ### Run Directly from Checkpoints to View Performance
@@ -93,10 +93,12 @@ Model performance is written to:
 
 ## Reproducibility
 
-### Seed
+### Seed and Determinism
 
 - Default random seed: `42`
 - Reproduce runs by explicitly setting `--seed 42` in commands
+- `cudnn.deterministic = True` and `cudnn.benchmark = False` are set in the `config.py`
+- Each run automatically saves a manifest to `history/` recording Git commit, configuration, package versions, and hardware info for full traceability
 - Small metric differences may still appear across hardware/library versions
 
 ### Training Time and GPU Memory

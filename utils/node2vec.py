@@ -7,8 +7,7 @@ import numpy as np
 class Node2vec(object):
 
     def __init__(self, graph, path_length, num_paths, p=1.0, q=1.0, dw=False, device=None, use_gpu=False, **kwargs):
-        # workerstranslated
-        kwargs["workers"] = kwargs.get("workers", 1) # translatedkey,translated1
+        kwargs["workers"] = kwargs.get("workers", 1)
         if dw:
             kwargs["hs"] = 1
             p = 1.0

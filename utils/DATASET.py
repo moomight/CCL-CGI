@@ -19,31 +19,23 @@ class _Dataset(Dataset):
 
 class BalancedBatchSampler(Sampler):
     def __init__(self, pos_indices, neg_indices, batch_size, data_source):
-        """
-        :param pos_indices: translated
-        :param neg_indices: translated
-        :param batch_size: translated batch translated
-        """
+        
         super().__init__(data_source)
         self.pos_indices = pos_indices
         self.neg_indices = neg_indices
         self.batch_size = batch_size
         self.pos_ratio = len(pos_indices) / (len(pos_indices) + len(neg_indices))
 
-        # translated batch translated
         self.pos_per_batch = math.ceil(batch_size * self.pos_ratio)
         self.neg_per_batch = batch_size - self.pos_per_batch
 
     def __iter__(self):
         my_list = list()
-        # translated
         pos_indices = np.random.permutation(self.pos_indices)
         neg_indices = np.random.permutation(self.neg_indices)
 
-        # translated
         pos_idx, neg_idx = 0, 0
         while pos_idx <= len(pos_indices) and neg_idx <= len(neg_indices):
-            # translated
             batch_pos = pos_indices[pos_idx:pos_idx + self.pos_per_batch]
             batch_neg = neg_indices[neg_idx:neg_idx + self.neg_per_batch]
             pos_idx += self.pos_per_batch
@@ -51,12 +43,10 @@ class BalancedBatchSampler(Sampler):
             pos_dis = len(pos_indices) - pos_idx
             neg_dis = len(neg_indices) - neg_idx
 
-            # translated
             batch = np.concatenate([batch_pos, batch_neg])
             np.random.shuffle(batch)
             my_list.extend(list(batch))
 
-            # translated/translatedbatch,translated...translated
             if pos_dis < self.pos_per_batch or neg_dis < self.neg_per_batch:
                 batch_pos = pos_indices[pos_idx:]
                 batch_neg = neg_indices[neg_idx:]
@@ -65,23 +55,7 @@ class BalancedBatchSampler(Sampler):
                 my_list.extend(list(batch))
                 break
 
-        # my_list = np.array(my_list).reshape(-1)
-        # my_list = list(my_list)
         return iter(my_list)
-            # translated batch translated
-            # yield batch
-
-            # # translated
-            # pos_idx += self.pos_per_batch
-            # neg_idx += self.neg_per_batch
-            #
-            # # translated,translated
-            # if pos_idx >= len(pos_indices):
-            #     pos_indices = np.random.permutation(self.pos_indices)
-            #     pos_idx = 0
-            # if neg_idx >= len(neg_indices):
-            #     neg_indices = np.random.permutation(self.neg_indices)
-            #     neg_idx = 0
 
     def __len__(self):
         return len(self.pos_indices) + len(self.neg_indices)

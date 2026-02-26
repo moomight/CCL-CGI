@@ -54,21 +54,16 @@ class MultiHeadAttention(nn.Module):
         return output, attention_weights
 
 def scaled_dot_product_attention(q, k, v, num_heads, mask=None):
-    # translated q translated k translated
     matmul_qk = torch.matmul(q, k.transpose(-2, -1))
     dk = torch.tensor(k.size(-1), dtype=torch.float32)
-    # translated
     scaling = dk ** -0.5
     scaled_attention_logits = matmul_qk * scaling
 
-    # translated
     if mask is not None:
         scaled_attention_logits += (mask * -1e9)
 
-    # translated
     attention_weights = F.softmax(scaled_attention_logits, dim=-1)
 
-    # translated v translated
     output = torch.matmul(attention_weights, v)
 
     return output, attention_weights

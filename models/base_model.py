@@ -33,7 +33,7 @@ class _ModelCheckpoint(pl.Callback):
         self.mode = mode
         self.value = 0. if mode == "max" else 1e6
 
-    def on_train_epoch_end(self, trainer, module): # translated
+    def on_train_epoch_end(self, trainer, module):
         save_state = {}
         for key, value in module.state_dict().items():
             if 'LLM' not in key:
@@ -55,7 +55,7 @@ class CSVLogger(pl.Callback):
         self.name = dirpath + filename
         # self.name += ".csv"
 
-    def on_train_epoch_end(self, trainer, module): # translatedlogtranslated
+    def on_train_epoch_end(self, trainer, module):
         history = pd.DataFrame(module.history)
         print(f"---history saved at {self.name}---")
         history.to_csv(self.name, index=False)
@@ -72,7 +72,7 @@ class LearningCurve(pl.Callback):
         self.figsize = figsize
         self.names = names
 
-    def on_fit_end(self, trainer, module): # translated.fittranslated
+    def on_fit_end(self, trainer, module):
         fold = module.config.K_Fold
         history = module.history
         for i, j in enumerate(self.names):

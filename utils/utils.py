@@ -28,7 +28,7 @@ def read_data(path):
             val_mask = None
         gene_symbols = f["gene_names"][:]
         has_nan = np.isnan(features).any()
-        print(f"featurestranslated NaN: {has_nan}")
+        print(f"features NaN: {has_nan}")
         features = np.nan_to_num(features, nan=0.0)
     return features, network, y_train, y_val, y_test, train_mask, val_mask, test_mask, gene_symbols
 

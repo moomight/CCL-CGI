@@ -5,12 +5,11 @@ import torch.nn.functional as F
 class SpatialEncoding(nn.Module):
     def __init__(self, d_sp_enc=64, activation='relu', d_model=8, n_neighbors=8):
         super(SpatialEncoding, self).__init__()
-        self.d_sp_enc = d_sp_enc  # translated
+        self.d_sp_enc = d_sp_enc
         self.d_model = d_model
-        self.n_neighbors = n_neighbors  # translated
+        self.n_neighbors = n_neighbors
         self.activation = activation
 
-        # d_sp_enc translated
         # n_neighbors → d_sp_enc → d_model
         self.dense1 = nn.Linear(n_neighbors, d_sp_enc)
         self.dense2 = nn.Linear(d_sp_enc, d_model)
