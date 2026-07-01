@@ -60,9 +60,22 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
                  threshold: float | None = None,
                  auto_threshold_by_val_f1: bool = False,
                  exclude_cell_types: list[str] | None = None):
+    """Prepare graph inputs and run cross-validation for CCL-CGI.
+
+    Args:
+        DATASET: Mapping from dataset name to the ordered cell-type list.
+        n_graphs, n_neighbors, n_layers: Graph sampling and Graphormer depth settings.
+        lr, dropout, loss_mul, dff, bz: Training hyperparameters passed to the model.
+        data_dir, h5_dir, sp_dir: Optional directories for processed arrays, H5 files, and shortest-path files.
+        fold_indices, checkpoint_path: Optional controls for evaluating selected folds or saved checkpoints.
+
+    Returns:
+        None. Metrics, manifests, and performance summaries are written to the configured log files.
+    """
 
     base_n_cell_types = n_cell_types
 
+    # Step 1: normalize runtime options and resolve dataset-specific paths.
     excluded_cell_types: list[str] = []
     if exclude_cell_types:
         cleaned: list[str] = []
@@ -143,6 +156,7 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
     print(f"max degree path: {degree_path}")
     print(f"Configuration: use_cancer_ppi={use_cancer_ppi}, use_64d_features={use_64d_features}")
 
+    # Step 2: generate or load reusable graph features for each selected cell type.
     # Decide whether to run preprocessing
     needs_preprocessing = force_preprocess or not os.path.exists(degree_path)
     
@@ -214,6 +228,7 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
 
     temp, results = init_metric_containers()
 
+    # Step 3: load labels and construct cross-validation splits on train/validation genes.
     if len(cell_type_list) > 1:
         resolved_global_ppi_h5 = global_ppi_h5
         if resolved_global_ppi_h5 is None:
@@ -264,6 +279,7 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
     NODE_NEIGHBOR = []
     SPATIAL_MATRIX = []
 
+    # Step 4: load model input tensors for the active cell types.
     # Only load first n_cell_types from DATASET
     dataset_keys = cell_type_list[:n_cell_types]
     print(f"\n{'='*80}")
@@ -309,13 +325,8 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
         # Ensure consistent 8-d baseline when state features are disabled (older caches may contain >8 dims)
         if (not use_64d_features) and node_feature.ndim == 2 and node_feature.shape[1] > 8:
             node_feature = node_feature[:, :8]
-        # NOTE (2025-12): 4-dim feature ablation was used for a one-off study.
-        # It is intentionally disabled now to avoid accidental changes to the default pipeline.
-        # If you need it again, re-enable the block below.
-        #
-        
         if (not use_64d_features) and feature_subset != 'all':
-            print(f"⚠️ feature_subset={feature_subset} requested but 4-dim ablation is disabled; proceeding with all 8 dims.")
+            print(f"⚠️ feature_subset={feature_subset} requested but only feature_subset='all' is supported; proceeding with all 8 dims.")
             feature_subset = 'all'
         if sanitize_features:
             node_feature, invalid_count = _sanitize_features_inplace(node_feature)
@@ -324,9 +335,7 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
         if use_64d_features and normalize_state_features:
             node_feature = _normalize_state_features_inplace(node_feature)
 
-        # ---------- Ensure subgraph/spatial caches exist ----------
-        # New (2026-02): allow changing n_graphs/n_neighbors without forcing full preprocessing.
-        # If caches are missing, regenerate them on the fly for this cell type only.
+        # Ensure the required subgraph and spatial inputs are available for this cell type.
         subgraph_path_rw = format_filename(
             processed_data_dir,
             subgraph_template,
@@ -418,13 +427,12 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
         SPATIAL_MATRIX.append(spatial_matrix)
         ADJ.append(adj)
 
-    # Set embed_dim based on feature dimensions
-    # 8 dims for basic features, 64 dims when using 64-d features
+    # Set the model input dimension from the loaded node-feature matrix.
     embed_dim = NODE_FEATURE[0].shape[-1]
     print(f"Using embed_dim={embed_dim} (use_64d_features={use_64d_features})")
     
-    # Calculate derived parameters (for logging)
-    # For 64-d models we want more heads (matches earlier intent/comments).
+    # Step 5: derive model settings and decide which folds/checkpoints to run.
+    # Use more attention heads for wider feature embeddings unless explicitly overridden.
     auto_num_heads = 8 if embed_dim >= 64 else 4
     num_heads = int(num_heads_override) if num_heads_override is not None else auto_num_heads
     if embed_dim % num_heads != 0:
@@ -470,6 +478,7 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
                 raise FileNotFoundError(f"Checkpoint path not found: {checkpoint_path}")
             print(f"Using direct checkpoint path: {checkpoint_path}")
 
+    # Step 6: train or evaluate each selected fold and collect fold-level metrics.
     for i in selected_folds:
 
         train_id, y_train, val_id, y_val = k_sets[i]
@@ -530,6 +539,7 @@ def process_data(DATASET: dict, n_graphs: int, n_neighbors: int, n_layers: int, 
         
         collect_fold_metrics(results=results, test_metrics=test_metrics)
 
+    # Step 7: summarize cross-validation performance and write final logs.
     macro_avg, macro_std, temp = summarize_metric_results(results=results, temp=temp)
 
     write_log(format_filename(LOG_DIR, RESULT_LOG["ALL"]), temp, "a")

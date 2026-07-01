@@ -1,6 +1,7 @@
 import torch.nn as nn
 
 class AttentionAggregate(nn.Module):
+    """Aggregates a sequence of embeddings into a single vector using multi-head self-attention followed by mean pooling."""
     def __init__(self, d_model, num_heads=4):
         self.d_model = d_model
         super(AttentionAggregate, self).__init__()
@@ -10,6 +11,7 @@ class AttentionAggregate(nn.Module):
         self._reset_parameters()
 
     def _reset_parameters(self):
+        """Kaiming-uniform init for all Linear layers."""
         for layer in self.modules():
             if isinstance(layer, nn.Linear):
                 nn.init.kaiming_uniform_(layer.weight, nonlinearity='relu')
@@ -17,6 +19,11 @@ class AttentionAggregate(nn.Module):
                     nn.init.zeros_(layer.bias)
 
     def forward(self, x):
+        """Args:
+            x: (batch_size, seq_len, d_model)
+        Returns:
+            output:       (batch_size, d_model) — mean-pooled attention output.
+            attn_weights: per-head attention weights."""
         x = x.transpose(0, 1)
         attn_output, attn_weights = self.attention(x, x, x,
                                                    need_weights=True, average_attn_weights=False

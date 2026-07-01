@@ -15,15 +15,18 @@ from tqdm import tqdm
 import sys
 
 class _EarlyStopping(EarlyStopping, pl.Callback):
+    """Thin wrapper to make EarlyStopping usable as a pl.Callback."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
 class MyTQDMProgressBar(TQDMProgressBar):
+    """Default TQDM progress bar with no customisation."""
 
     def __init__(self):
         super(MyTQDMProgressBar, self).__init__()
 
 class _ModelCheckpoint(pl.Callback):
+    """Custom checkpoint callback that saves the best model state dict based on a monitored metric."""
     def __init__(self, dirpath="checkpoint/", filename="checkpoint", monitor="val_auc", mode="max"):
         super(_ModelCheckpoint, self).__init__()
         os.makedirs(dirpath, exist_ok=True)
@@ -34,6 +37,7 @@ class _ModelCheckpoint(pl.Callback):
         self.value = 0. if mode == "max" else 1e6
 
     def on_train_epoch_end(self, trainer, module):
+        # Collect state dict
         save_state = {}
         for key, value in module.state_dict().items():
             if 'LLM' not in key:
@@ -48,6 +52,7 @@ class _ModelCheckpoint(pl.Callback):
             print(f"model state saved at {self.name}")
 
 class CSVLogger(pl.Callback):
+    """Callback that exports training history to a CSV file after each epoch."""
     def __init__(self, dirpath="history/", filename="history"):
         super(CSVLogger, self).__init__()
         if not os.path.exists(dirpath):
@@ -64,6 +69,7 @@ class CSVLogger(pl.Callback):
         print(pl_module.history)
 
 class LearningCurve(pl.Callback):
+    """Callback that plots learning curves for selected validation metrics and saves them as PNG files at the end of training."""
     def __init__(self, dirpath="../curve/", figsize=(4, 4), names=("val_loss", "val_acc", "val_auc", "val_aupr", "val_f1", "val_mcc")):
         super(LearningCurve, self).__init__()
         if not os.path.exists(dirpath):
@@ -85,12 +91,17 @@ class LearningCurve(pl.Callback):
         # plt.show()
 
 class BaseModel(object):
+    """Abstract base class for all model wrappers.
+
+    Subclasses (e.g. TREE) must implement ``build``, ``fit``, ``predict``, ``score``, and ``load_best_model``.
+    """
     def __init__(self, config: ModelConfig):
         self.config = config
         self.callbacks = []
         self.model = self.build()
 
     def add_model_checkpoint(self):
+        """Register a _ModelCheckpoint callback using config settings."""
         self.callbacks.append(_ModelCheckpoint(
             dirpath=self.config.checkpoint_dir,
             filename='{}.pkl'.format(self.config.exp_name),
@@ -101,10 +112,12 @@ class BaseModel(object):
         print('Logging Info - Callback Added: ModelCheckPoint...')
 
     def add_tqdm(self):
+        """Register a TQDM progress bar callback."""
         self.callbacks.append(MyTQDMProgressBar())
         print('Logging Info - Callback Added: MyTQDMProgressBar...')
 
     def add_early_stopping(self):
+        """Register an early-stopping callback using config settings."""
         self.callbacks.append(_EarlyStopping(
             monitor=self.config.early_stopping_monitor,
             mode=self.config.early_stopping_mode,
@@ -119,6 +132,7 @@ class BaseModel(object):
         ))
 
     def init_callbacks(self):
+        """Initialise training callbacks based on ``config.callbacks_to_add``."""
         # self.add_CSVLogger()
         # self.callbacks.append(LearningCurve())
         self.add_tqdm()

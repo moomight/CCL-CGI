@@ -6,4 +6,3 @@ from .attentionFusion import AttentionFusion
 from .cellTypeSpecEmbedding import CellTypeSpecEmbedding
 from .tensorToString import FloatToStringMapper
 from .aggregate import AttentionAggregate
-from .extendedAttentionAggregate import ExtendedAttentionAggregate

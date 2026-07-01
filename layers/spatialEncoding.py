@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class SpatialEncoding(nn.Module):
+    """Two-layer MLP that maps shortest-path distances into d_model-dimensional spatial encodings (n_neighbors → d_sp_enc → d_model)."""
     def __init__(self, d_sp_enc=64, activation='relu', d_model=8, n_neighbors=8):
         super(SpatialEncoding, self).__init__()
         self.d_sp_enc = d_sp_enc
@@ -16,6 +17,10 @@ class SpatialEncoding(nn.Module):
         self.dropout = nn.Dropout(0.1)
 
     def forward(self, distances):
+        """Args:
+            distances: shortest-path distance features, shape (batch_size, n_nodes, n_neighbors).
+        Returns:
+            Spatial encoding of shape (batch_size, n_nodes, d_model)."""
         distances = distances.float()
         outputs = F.relu(self.dense1(distances))  # [batch_size, n_nodes, d_sp_enc]
         outputs = F.relu(self.dense2(outputs))  # [batch_size, n_nodes, d_model]

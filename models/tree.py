@@ -15,22 +15,49 @@ from utils.statistical_tests import find_optimal_threshold
 from models.panCancerGenePredict import PanCancerGenePredict
 import numpy as np
 
+
 class TREE(BaseModel):
+    """High-level model wrapper that orchestrates the full training, evaluation, and inference lifecycle for the PanCancerGenePredict (Graphormer-based) model.
+
+    Inherits from BaseModel and implements concrete methods for:
+      - Building the underlying PanCancerGenePredict network
+      - Training with balanced sampling via PyTorch Lightning Trainer
+      - Prediction, testing, and scoring with standard classification metrics
+      - Checkpoint loading / saving
+      - Threshold tuning on a held-out validation set
+      - Extracting intermediate representations (attention weights, embeddings)
+    """
+
     def __init__(self, config):
         super(TREE, self).__init__(config)
 
     def _runtime_device(self):
+        """Resolve the device to use at runtime.
+        Respects ``config.device`` when set to a CUDA device and CUDA is actually available; falls back to CPU otherwise."""
         configured = getattr(self.config, "device", None)
         if configured is not None and str(configured).startswith("cuda") and torch.cuda.is_available():
             return "cuda"
         return "cpu"
 
     def build(self):
+        """Instantiate the PanCancerGenePredict network and move it to the appropriate device.  Called automatically by ``BaseModel.__init__``."""
         model = PanCancerGenePredict(self.config).to(self._runtime_device())
 
         return model
 
     def fit(self, x_train, y_train, x_val, y_val):
+        """Train the model using PyTorch Lightning's ``Trainer.fit``.
+
+        Key details:
+          - Uses ``BalancedBatchSampler`` to handle class imbalance by ensuring each mini-batch contains roughly equal positive and negative samples.
+          - DataLoader worker counts and prefetch factors are configurable via environment variables (``CCL_TRAIN_NUM_WORKERS``, etc.).
+          - Callbacks (checkpoint, early stopping, progress bar) are initialised via ``BaseModel.init_callbacks``.
+
+        Args:
+            x_train: Training feature array.
+            y_train: Training label array (boolean / binary).
+            x_val:   Validation feature array.
+            y_val:   Validation label array."""
         self.model.train()
         pl.seed_everything(42)
         self.callbacks = []
@@ -40,12 +67,14 @@ class TREE(BaseModel):
         _KGCNMetric = KGCNMetric(x_train, y_train, x_val, y_val, self.config.dataset)
         print('Logging Info - Start training...')
 
+        # ===== DataLoader configuration from environment variables =====
         train_num_workers = max(0, int(os.environ.get('CCL_TRAIN_NUM_WORKERS', 4)))
         val_num_workers = max(0, int(os.environ.get('CCL_VAL_NUM_WORKERS', 16)))
         train_prefetch_factor = max(1, int(os.environ.get('CCL_TRAIN_PREFETCH_FACTOR', 2)))
         val_prefetch_factor = max(1, int(os.environ.get('CCL_VAL_PREFETCH_FACTOR', 4)))
         val_persistent_workers = (val_num_workers > 0) and (os.environ.get('CCL_VAL_PERSISTENT_WORKERS', '1') == '1')
 
+        # ===== Build balanced training DataLoader =====
         train_ds = _Dataset(x_train, y_train)
         pos_indices = np.where(y_train == True)[0]
         neg_indices = np.where(y_train == False)[0]
@@ -61,6 +90,7 @@ class TREE(BaseModel):
             train_loader_kwargs['prefetch_factor'] = train_prefetch_factor
         train_loader = DataLoader(train_ds, **train_loader_kwargs)
 
+        # ===== Build balanced validation DataLoader =====
         val_ds = _Dataset(x_val, y_val)
         pos_indices = np.where(y_val == True)[0]
         neg_indices = np.where(y_val == False)[0]
@@ -75,6 +105,8 @@ class TREE(BaseModel):
         if val_num_workers > 0:
             val_loader_kwargs['prefetch_factor'] = val_prefetch_factor
         val_loader = DataLoader(val_ds, **val_loader_kwargs)
+
+        # ===== Configure and launch Lightning Trainer =====
         trainer = Trainer(
             accelerator='gpu' if self._runtime_device() == 'cuda' else 'cpu',
             devices=1,
@@ -90,9 +122,17 @@ class TREE(BaseModel):
         print('Logging Info - training end...')
 
     def get_variables(self):
+        """Return trainable weight parameters of the underlying model."""
         return self.model.trainable_weights
 
     def predict(self, x):
+        """Run a forward pass and return sigmoid-activated prediction scores.
+
+        Args:
+            x: Input features (numpy array or torch tensor).
+
+        Returns:
+            Tensor of prediction probabilities in [0, 1]."""
         self.model.eval()
         runtime_device = self._runtime_device()
         self.model.to(runtime_device)
@@ -104,11 +144,27 @@ class TREE(BaseModel):
         return output
 
     def test(self, x, y):
+        """Evaluate the model on a test set using Lightning's ``Trainer.test``.
+
+        Constructs a balanced test DataLoader (worker counts configurable via ``CCL_TEST_*`` environment variables) and delegates to the Trainer.
+        Metrics are computed inside ``PanCancerGenePredict.on_test_end()`` and stored as model attributes, which are then collected into a result dict.
+
+        Args:
+            x: Test feature array.
+            y: Test label array (boolean / binary).
+
+        Returns:
+            dict with keys:
+              - ``metrics``: auc, aupr, acc, mcc, brier, ece, optimal_threshold, optimal_precision, optimal_recall, optimal_f1.
+              - ``y_true``:       Raw ground-truth labels collected during test.
+              - ``y_pred_proba``: Raw predicted probabilities collected during test."""
         self.model.eval()
+        # ===== DataLoader configuration from environment variables =====
         test_num_workers = max(0, int(os.environ.get('CCL_TEST_NUM_WORKERS', 16)))
         test_prefetch_factor = max(1, int(os.environ.get('CCL_TEST_PREFETCH_FACTOR', 4)))
         test_persistent_workers = (test_num_workers > 0) and (os.environ.get('CCL_TEST_PERSISTENT_WORKERS', '1') == '1')
 
+        # ===== Build balanced test DataLoader =====
         test_ds = _Dataset(x, y)
         pos_indices = np.where(y == True)[0]
         neg_indices = np.where(y == False)[0]
@@ -132,8 +188,7 @@ class TREE(BaseModel):
         )
         trainer.test(self.model, test_loader)
 
-        # Return test metrics from the model with raw predictions
-        # The metrics are computed in on_test_end() and stored
+        # Collect test metrics stored by PanCancerGenePredict.on_test_end()
         return {
             'metrics': {
                 'auc': self.model.test_auc_final if hasattr(self.model, 'test_auc_final') else None,
@@ -152,6 +207,16 @@ class TREE(BaseModel):
         }
 
     def score(self, x, y, threshold=0.5):
+        """Compute a suite of binary classification metrics on the given data.
+
+        Args:
+            x: Feature array.
+            y: Ground-truth label tensor.
+            threshold: Decision threshold for converting probabilities to binary predictions (default 0.5).
+
+        Returns:
+            Tuple of (auc, acc, precision, recall, f1, aupr, fpr_list, tpr_list, mcc)."""
+
         x = torch.tensor(x).to(self._runtime_device())
         y_pred = self.predict(x).cpu()
         y_true = y.float().cpu()
@@ -170,6 +235,7 @@ class TREE(BaseModel):
         return auc, acc, p, r, f1, aupr, fpr.tolist(), tpr.tolist(), mcc
 
     def load_train_model(self):
+        """Load a training-phase checkpoint (transformer_Node2vec*.pkl)."""
         print('Logging Info - Loading model training checkpoint: transformer_Node2vec%s.pkl' % self.config.exp_name)
         name = '{}.pkl'.format(self.config.exp_name)
         model_train_save_path = f"{self.config.checkpoint_dir}/transformer_Node2vec{name}"
@@ -178,6 +244,10 @@ class TREE(BaseModel):
         print('Logging Info - Model loaded')
 
     def load_best_model(self, checkpoint_path=None):
+        """Load the best model checkpoint.
+
+        Args:
+            checkpoint_path: Optional explicit path to the checkpoint file."""
         if checkpoint_path is not None:
             resolved_checkpoint_path = checkpoint_path
             print(f'Logging Info - Loading model checkpoint from path: {resolved_checkpoint_path}')
@@ -196,6 +266,12 @@ class TREE(BaseModel):
         print('Logging Info - Model loaded')
 
     def tune_threshold_by_validation(self, x_val, y_val):
+        """Automatically select the optimal classification threshold using a validation set.
+        Falls back to 0.5 if the validation set is empty or contains only a single class.
+
+        Args:
+            x_val: Validation feature array.
+            y_val: Validation label array."""
         runtime_device = self._runtime_device()
         self.model.eval()
         self.model.to(runtime_device)
@@ -217,6 +293,7 @@ class TREE(BaseModel):
                 x_batch = x_batch.to(runtime_device)
                 y_batch = y_batch.float().to(runtime_device)
                 logits, _, _, _ = self.model(x_batch)
+                # Flatten logits and labels to handle both (N,1) and (N,) shapes
                 logits = logits.view(logits.size(0), -1)
                 y_batch = y_batch.view(y_batch.size(0), -1)
                 if logits.size(-1) == 1 and y_batch.size(-1) == 1:
@@ -226,6 +303,7 @@ class TREE(BaseModel):
                 y_true_batches.append(y_batch.detach().cpu())
                 y_pred_proba_batches.append(torch.sigmoid(logits).detach().cpu())
 
+        # Guard: skip if no validation data was produced
         if len(y_true_batches) == 0:
             self.model.threshold = getattr(self.config, 'threshold', 0.5)
             print('Logging Info - Validation threshold tuning skipped: empty validation data, using threshold=0.5')
@@ -234,6 +312,7 @@ class TREE(BaseModel):
         y_true = torch.cat(y_true_batches, dim=0).numpy()
         y_pred_proba = torch.cat(y_pred_proba_batches, dim=0).numpy()
 
+        # Guard: need both classes present for meaningful threshold search
         if len(np.unique(y_true)) < 2:
             self.model.threshold = getattr(self.config, 'threshold', 0.5)
             print('Logging Info - Validation threshold tuning skipped: single-class validation labels, using threshold=0.5')
@@ -250,6 +329,13 @@ class TREE(BaseModel):
         )
 
     def get_attn_weights(self, x):
+        """Extract multi-head attention weights from the Graphormer encoder.
+
+        Args:
+            x: Input features (numpy array or torch tensor).
+
+        Returns:
+            Attention weight tensor produced by the model's forward pass."""
         self.model.eval()
         if not torch.is_tensor(x):
             x = torch.tensor(x)
@@ -258,6 +344,13 @@ class TREE(BaseModel):
         return attention_weight
 
     def get_celltype_embeddings(self, x):
+        """Extract cell-type-specific embeddings from the model.
+
+        Args:
+            x: Input features (numpy array or torch tensor).
+
+        Returns:
+            Cell-type embedding tensor of shape (N, num_cell_types, d_model)."""
         self.model.eval()
         if not torch.is_tensor(x):
             x = torch.tensor(x)
@@ -267,6 +360,13 @@ class TREE(BaseModel):
         return celltypeEmbedding
 
     def get_embeddings(self, x):
+        """Extract the final hidden embeddings from the Graphormer encoder.
+
+        Args:
+            x: Input features (numpy array or torch tensor).
+
+        Returns:
+            Embedding tensor from the model's forward pass."""
         self.model.eval()
         if not torch.is_tensor(x):
             x = torch.tensor(x)

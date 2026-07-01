@@ -1,6 +1,7 @@
 import torch
 
 class FloatToStringMapper(torch.nn.Module):
+    """Utility module that converts a 1-D float tensor into a single space-separated string."""
     def __init__(self):
         super(FloatToStringMapper, self).__init__()
 

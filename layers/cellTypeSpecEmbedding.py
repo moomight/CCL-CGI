@@ -2,10 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from layers import CentralityEncoding, GraphormerBlock, AttentionFusion
-from losses import WeightedBinaryCrossEntropy
+# from losses import WeightedBinaryCrossEntropy
 from torch.autograd import Variable
 
 class CellTypeSpecEmbedding(nn.Module):
+    """Produces a cell-type-specific embedding for a given gene (node) by running its local sub-graphs through a stack of Graphormer layers and fusing the per-graph embeddings with AttentionFusion.
+    Each cell type has its own PPI neighbourhood structure; this module looks up the relevant subgraph for each input node, applies centrality + spatial encoding, passes through shared Graphormer blocks, and fuses multi-graph outputs."""
     def __init__(self, config, cell_type_num):
         super(CellTypeSpecEmbedding, self).__init__()
         self.cell_type_num = cell_type_num
@@ -27,6 +29,19 @@ class CellTypeSpecEmbedding(nn.Module):
         # self.spatial_matrix = torch.tensor(self.config.spatial_matrix).to('cuda')
 
     def forward(self, input_node_id):
+        """Compute the fused cell-type embedding for a batch of gene node IDs.
+
+        For each PPI graph channel:
+          1. Look up sub-graph features, distances, and spatial matrices.
+          2. Add centrality encoding to node features.
+          3. Pass through n_layers Graphormer blocks.
+          4. Take the target node embedding (index 0).
+        Finally fuse all channel embeddings via AttentionFusion.
+
+        Args:
+            input_node_id: (batch_size,) tensor of gene node indices.
+        Returns:
+            finalembedding: (batch_size, d_model) fused embedding."""
         sub_node_feature, sub_distance, sub_spatial, sub_node_neighbor = self.get_sub_info(input_node_id)
         sub_node_feature = torch.nan_to_num(sub_node_feature, 0.0)
         if self.cell_type_num == 18:
@@ -73,6 +88,13 @@ class CellTypeSpecEmbedding(nn.Module):
         return finalembedding
 
     def get_final_embedding_all(self, attention_weights, embeddings):
+        """Re-weight per-layer per-graph embeddings by attention weights and aggregate.
+
+        Args:
+            attention_weights: (batch, n_channels) from AttentionFusion.
+            embeddings: flat (batch, n_graphs * n_layers * d_model).
+        Returns:
+            Weighted embedding of shape (batch, n_layers, 1, d_model)."""
         embeddings = embeddings.view(-1, self.config.n_graphs, self.config.n_layers, self.config.d_model)
         embeddings = embeddings.permute(0, 2, 1, 3)  # [bz, n_layers, n_graphs, d_model]
         attention_weights = attention_weights.view(-1, 1, self.config.n_graphs).unsqueeze(1)  # [bz, 1, 1, n_graphs]
@@ -80,11 +102,22 @@ class CellTypeSpecEmbedding(nn.Module):
 
         return torch.matmul(attention_weights, embeddings)
 
-    def weight_loss(self, y_true, y_pred):
-        l = WeightedBinaryCrossEntropy(self.config.loss_mul)
-        return l.get_loss(y_true, y_pred)
+    # def weight_loss(self, y_true, y_pred):
+    #     """Compute weighted binary cross-entropy loss."""
+    #     l = WeightedBinaryCrossEntropy(self.config.loss_mul)
+    #     return l.get_loss(y_true, y_pred)
 
     def get_sub_info(self, node_id):
+        """Look up the local sub-graph information for a batch of node IDs.
+
+        Retrieves from pre-computed config arrays:
+          - node_feature: neighbour feature matrix
+          - distance: distance (degree) matrix for centrality encoding
+          - spatial: shortest-path spatial matrix for spatial encoding
+          - node_neighbors: neighbour index list
+
+        Returns:
+            (node_feature, distance, spatial, node_neighbors) — all shaped (batch, n_graphs, n_neighbors, ...) or similar."""
         length = len(node_id)
         node_neighbors = torch.index_select(torch.tensor(self.config.node_neighbor[self.cell_type_num]).to('cuda'), 0, node_id)
         node_neighbors = torch.squeeze(node_neighbors, dim=1)
@@ -120,9 +153,11 @@ class CellTypeSpecEmbedding(nn.Module):
         return node_feature, distance, spatial, node_neighbors
 
     def create_padding_mask(self, nodes):
+        """Create a float mask."""
         return (nodes == -1).float()
 
     def get_node_feature(self, node_embedding, centr_encoding):
+        """Scale node features by sqrt(d_model) and add centrality encoding, then apply dropout."""
         node_feature = node_embedding
         node_feature *= torch.sqrt(torch.tensor(self.config.d_model, dtype=torch.float32))
         node_feature += centr_encoding

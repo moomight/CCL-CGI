@@ -12,8 +12,14 @@ import os
 from losses import compute_triplet_loss_for_hardest_case, compute_triplet_loss_for_all
 
 class PanCancerGenePredict(pl.LightningModule):
+    """Lightning module for predicting cancer gene labels from cell-type-specific PPI subgraphs."""
+
     def __init__(self, config):
+        """Build model layers and place precomputed graph tensors on the runtime device."""
         super(PanCancerGenePredict, self).__init__()
+
+        # ===== Device & Reproducibility Setup =====
+        # Determine compute device (CUDA/CPU), set classification threshold, and fix all random seeds for reproducible training.
         self.config = config
         requested_device = str(getattr(self.config, 'device', 'cuda'))
         use_cuda = requested_device.startswith('cuda') and torch.cuda.is_available()
@@ -28,6 +34,9 @@ class PanCancerGenePredict(pl.LightningModule):
             torch.cuda.manual_seed_all(seed)
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
+
+        # ===== Classification Head (MLP) =====
+        #  Uses Kaiming init and bias correction based on the positive class fraction to handle class imbalance.
         self.fc = nn.Sequential(
             nn.Linear(self.config.d_model, 256),
             nn.ReLU(),
@@ -50,6 +59,9 @@ class PanCancerGenePredict(pl.LightningModule):
         bias_value = -torch.log((1 - positive_fraction) / positive_fraction)
         self.fc[-1].bias.data.fill_(bias_value)
 
+        # ===== Graphormer Encoder & Graph Structure Layers =====
+        # - graphormer_layers: stacked Graphormer blocks with spatial encoding and multi-head attention.
+        # - centrEncodingLayer: per-cell-type centrality (degree) encoding added to node features.
         self.graphormer_layers = nn.ModuleList(
             [GraphormerBlock(self.config.d_model, self.config.num_heads, self.config.dff, self.config.dropout,
                              self.config.d_sp_enc, self.config.sp_enc_activation, self.config.n_neighbors)
@@ -60,16 +72,31 @@ class PanCancerGenePredict(pl.LightningModule):
                                self.config.d_model)
             for cell_type_num in range(self.config.n_cell_types)]
         )
+
+        # ===== Attention Fusion & Cross-Cell-Type Aggregation =====
+        # - attentionLayer: fuses multi-channel embeddings within one cell type via attention.
+        # - aggregateLayer: aggregates embeddings across all cell types into a unified representation.
         self.attentionLayer = AttentionFusion(d_model=self.config.d_model, n_channels=self.config.n_graphs).to(self.runtime_device)
         self.aggregateLayer = AttentionAggregate(d_model=self.config.d_model, num_heads=self.config.num_heads).to(self.runtime_device)
 
+        # ===== Feature Projection =====
+        # Linear projection applied to node features before entering Graphormer blocks.
         self.Linear = nn.Linear(self.config.d_model, self.config.d_model).to(self.runtime_device)
         self.Relu = nn.ReLU()
 
+        # ===== Loss Function =====
+        # Weighted BCE loss with pos_weight derived from class imbalance ratio (loss_mul).
         pos_weight_value = (1.0 - self.config.loss_mul) / self.config.loss_mul
         self.criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(pos_weight_value, device=self.runtime_device))
         print(f"BCEWithLogitsLoss pos_weight set to {pos_weight_value:.4f} (based on loss_mul={self.config.loss_mul})")
 
+        # ===== Precomputed Graph Tensors (Cached on Device) =====
+        # Move all graph structure data to GPU once during init to avoid repeated CPU-GPU transfers.
+        # - cached_idx_tensors: global PPI node indices belonging to each cell type.
+        # - cached_node_features: node feature matrices per cell type.
+        # - cached_distance_matrices: degree/distance matrices per cell type.
+        # - cached_spatial_matrices: spatial encoding matrices per cell type.
+        # - cached_node_neighbors: sampled neighbor IDs (from node2vec walks) per cell type.
         self.cached_idx_tensors = [
             torch.tensor(config.idx[i], dtype=torch.long, device=self.runtime_device)
             for i in range(self.config.n_cell_types)
@@ -92,7 +119,10 @@ class PanCancerGenePredict(pl.LightningModule):
             for i in range(self.config.n_cell_types)
         ]
 
-        # Precompute per-cell-type membership masks to avoid torch.isin on CUDA.
+        # ===== Membership Masks & Index Mappings =====
+        # - cached_membership_masks: boolean mask indicating which global nodes belong to each cell type.
+        #   Used for fast batch-level filtering without torch.isin.
+        # - cached_idx_mappings: maps global PPI node index -> local (cell-type-specific) index for feature lookup.
         # Shape: [n_cell_types, n_global_nodes], bool
         global_node_count = int(self.cached_node_neighbors[0].shape[0]) if self.cached_node_neighbors else 0
         self.cached_membership_masks = []
@@ -113,12 +143,19 @@ class PanCancerGenePredict(pl.LightningModule):
                 mapping[global_idx] = local_i
             self.cached_idx_mappings.append(mapping)
 
+        # ===== Scaling Constants & Learnable Loss Weights =====
+        # - sqrt_d_model: scaling factor for node feature normalization.
+        # - alpha, beta: learnable parameters controlling the balance between classification loss and triplet loss in the total objective.
+        # - lambda_reg: regularization coefficient penalizing large alpha/beta.
         self.sqrt_d_model = torch.sqrt(torch.tensor(self.config.d_model, dtype=torch.float32, device=self.runtime_device))
 
         self.alpha = nn.Parameter(torch.tensor(1.0, requires_grad=True))
         self.beta = nn.Parameter(torch.tensor(0.1, requires_grad=True))
         self.lambda_reg = self.config.lambda_reg
 
+
+        # ===== Epoch-Level Metric Accumulators =====
+        # Accumulate per-batch metrics during training/validation/test for epoch-end averaging.
         self.loss = 0
         self.acc = 0
         self.auc = 0
@@ -145,6 +182,10 @@ class PanCancerGenePredict(pl.LightningModule):
         }
 
     def forward(self, input_node_id):
+        """Run inference for a batch of global PPI node IDs.
+
+        Returns logits, the concatenated cell-type embeddings, the final fused embedding, and attention weights.
+        """
         finalembedding = self.embedding_layer(input_node_id, self.config)
         finalembedding_ = finalembedding.view(len(input_node_id), -1, self.config.d_model)
         finalembedding_, _ = self.aggregateLayer(finalembedding_) # _: attention weights
@@ -152,6 +193,7 @@ class PanCancerGenePredict(pl.LightningModule):
         return x, finalembedding, finalembedding_, _
 
     def training_step(self, batch, batch_idx):
+        """Compute the training objective for one batch, combining BCE classification loss and triplet loss."""
         self.batch_idx += 1
         x, y = batch
         x = x.to(self.device)
@@ -215,6 +257,7 @@ class PanCancerGenePredict(pl.LightningModule):
         self.val_loss = 0
 
     def validation_step(self, batch, batch_idx):
+        """Evaluate one validation batch and accumulate epoch-level validation metrics."""
         self.val_idx += 1
         x, y = batch
         x = x.to(self.device)
@@ -277,6 +320,7 @@ class PanCancerGenePredict(pl.LightningModule):
         print(f"val loss:{self.val_loss} acc:{self.val_acc} auc:{self.val_auc} aupr:{self.val_aupr} f1:{self.val_f1} mcc:{self.val_mcc}")
 
     def test_step(self, batch, batch_idx):
+        """Evaluate one test batch and keep probabilities for final metric and calibration reporting."""
         x, y = batch
         x = x.to(self.device)
         y = y.float().to(self.device)
@@ -406,6 +450,10 @@ class PanCancerGenePredict(pl.LightningModule):
         }
 
     def embedding_layer(self, node_id, config):
+        """Collect embeddings for each input node across all available cell types.
+
+        Nodes absent from a cell type keep a zero embedding, so the output keeps a fixed cell-type order.
+        """
         if not torch.is_tensor(node_id):
             node_id = torch.tensor(node_id, dtype=torch.long, device=self.device)
         elif node_id.device != self.device:
@@ -447,6 +495,10 @@ class PanCancerGenePredict(pl.LightningModule):
         return finalembedding
 
     def get_cell_type_layer_embeddings(self, input_node_id, cell_type_num):
+        """Generate embeddings for one cell type from its sampled subgraphs.
+
+        Each graph channel is encoded by the Graphormer layers, then channel embeddings are fused by attention.
+        """
         
         sub_node_feature, sub_distance, sub_spatial, sub_node_neighbor = self.get_sub_info(input_node_id, cell_type_num)
         sub_node_feature = torch.nan_to_num(sub_node_feature, 0.0)
@@ -486,6 +538,7 @@ class PanCancerGenePredict(pl.LightningModule):
         return (nodes == -1).float()
 
     def get_node_feature(self, node_embedding, centr_encoding):
+        """Combine raw node features with centrality encoding before Graphormer processing."""
         
         node_feature = node_embedding
         node_feature = node_feature * self.sqrt_d_model
@@ -494,6 +547,10 @@ class PanCancerGenePredict(pl.LightningModule):
         return F.dropout(node_feature, p=self.config.dropout, training=self.config.training)
 
     def get_sub_info(self, node_id, cell_type_num):
+        """Fetch subgraph tensors for the requested nodes in one cell type.
+
+        Returns node features, degree-distance matrices, spatial matrices, and sampled neighbor IDs.
+        """
         
         length = len(node_id)
 

@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class AttentionFusion(nn.Module):
+    """Fuses multi-channel embeddings (one per PPI graph) into a single d_model vector."""
     def __init__(self, d_model, n_channels):
         super(AttentionFusion, self).__init__()
         self.n_channels = n_channels
@@ -19,6 +20,11 @@ class AttentionFusion(nn.Module):
         return x.permute(0, 2, 1, 3)
 
     def forward(self, x):
+        """Args:
+            x: (batch_size, n_channels * d_model) — concatenated channel embeddings.
+        Returns:
+            fused: (batch_size, d_model) — layer-normed fused embedding.
+            attention_weights: channel-level attention weights."""
         batch_size = x.size(0)
         x = x.unsqueeze(1)
 

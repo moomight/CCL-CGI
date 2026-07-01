@@ -5,6 +5,7 @@ from .multiHeadAttention import MultiHeadAttention
 
 
 class GraphormerBlock(nn.Module):
+    """Single Graphormer encoder block: pre-norm multi-head attention + feed-forward, both with residual connections."""
     def __init__(self, d_model, num_heads, dff, rate=0.1, d_sp_enc=64, sp_enc_activation='relu', n_neighbors=8):
         super(GraphormerBlock, self).__init__()
 
@@ -18,6 +19,16 @@ class GraphormerBlock(nn.Module):
         self.dropout2 = nn.Dropout(rate)
 
     def forward(self, x, training, mask, min_distance_matrix):
+        """Pre-norm Transformer block: LN → MHA → residual → LN → FFN → residual.
+
+        Args:
+            x: node embeddings, (batch_size, seq_len, d_model).
+            training: whether in training mode (unused here, kept for API compat).
+            mask: padding mask for attention.
+            min_distance_matrix: shortest-path distances fed to spatial encoding.
+        Returns:
+            out2: updated node embeddings.
+            _: attention weights from the MHA layer."""
         residual = x
         x_norm = self.layernorm1(x)
         attn_output, _, = self.mha(x_norm, min_distance_matrix, mask)
@@ -34,6 +45,7 @@ class GraphormerBlock(nn.Module):
 
 
 def point_wise_feed_forward_network(d_model, dff):
+    """Two-layer position-wise FFN: Linear(d_model→dff) → ReLU → Linear(dff→d_model)."""
     return nn.Sequential(
         nn.Linear(d_model, dff),
         nn.ReLU(),

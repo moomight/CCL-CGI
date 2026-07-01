@@ -2,16 +2,14 @@ import torch
 import torch.nn.functional as F
 
 def compute_triplet_loss_for_hardest_case(embeddings, labels, margin=1.0):
-    """
+    """Batch-hard triplet loss: for each anchor, picks the hardest positive (farthest) and hardest negative (closest), then applies a margin-based hinge loss.
 
     Args:
-        embeddings: (batch_size, embedding_dim) 
-        labels: (batch_size,) 
-        margin: float 
-
+        embeddings: (batch_size, embedding_dim) — will be L2-normalised internally.
+        labels: (batch_size,) integer class labels.
+        margin: margin for the triplet loss.
     Returns:
-        triplet_loss: scalar 
-    """
+        triplet_loss: scalar mean loss over valid anchors."""
     device = embeddings.device
     batch_size = embeddings.size(0)
 
@@ -42,10 +40,11 @@ def compute_triplet_loss_for_hardest_case(embeddings, labels, margin=1.0):
     if valid_anchors.sum() == 0:
         return torch.tensor(0.0, device=device, requires_grad=True)
 
-
+    # Hardest positive: max distance among same-label pairs
     masked_positive_dist = dist_matrix * positive_mask + (1 - positive_mask) * (-1e9)
     hardest_positive_dist = masked_positive_dist.max(dim=1, keepdim=True)[0]  # (batch, 1)
 
+    # Hardest negative: min distance among different-label pairs
     masked_negative_dist = dist_matrix * negative_mask + (1 - negative_mask) * 1e9
     hardest_negative_dist = masked_negative_dist.min(dim=1, keepdim=True)[0]  # (batch, 1)
 
@@ -63,6 +62,15 @@ def compute_triplet_loss_for_hardest_case(embeddings, labels, margin=1.0):
     return triplet_loss
 
 def compute_triplet_loss_for_all(embeddings, labels, margin=1.0):
+    """Batch-all triplet loss: enumerates all valid (anchor, positive, negative) triplets and averages the margin-based hinge loss over them.
+    Used in CCL-CGI.
+
+    Args:
+        embeddings: (batch_size, embedding_dim).
+        labels: (batch_size,) integer class labels.
+        margin: margin for the triplet loss.
+    Returns:
+        Scalar mean triplet loss over all valid triplets."""
     device = embeddings.device
     embeddings = F.normalize(embeddings, p=2, dim=1)
     batch_size = embeddings.size(0)
@@ -102,7 +110,14 @@ def compute_triplet_loss_for_all(embeddings, labels, margin=1.0):
     return loss
 
 def compute_triplet_loss_old(embeddings, labels, margin=1):
-    
+    """Naive O(N^3) triplet loss with explicit loops (legacy, kept for reference).
+
+    Args:
+        embeddings: (batch_size, embedding_dim).
+        labels:     (batch_size,) integer class labels.
+        margin:     margin for the triplet loss.
+    Returns:
+        Scalar mean triplet loss."""
     # embeddings: (batch_size, embedding_dim)
     # labels: (batch_size,)
     device = embeddings.device
