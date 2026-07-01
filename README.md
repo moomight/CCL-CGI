@@ -93,6 +93,10 @@ Model performance is written to:
 
 ## Reproducibility
 
+### Preprocessing
+
+Please see [`preprocessing/README.md`](preprocessing/README.md) for the details of preprocessing.
+
 ### Seed and Determinism
 
 - Default random seed: `42`

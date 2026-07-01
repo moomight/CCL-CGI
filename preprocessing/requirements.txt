@@ -1,0 +1,10 @@
+anndata
+decoupler
+h5py
+networkx
+numpy
+pandas
+scanpy
+scipy
+xgboost
+leidenalg
